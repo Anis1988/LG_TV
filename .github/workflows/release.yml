@@ -1,0 +1,63 @@
+# Builds the Android app and publishes it as a GitHub Release.
+# Trigger: push a tag like v1.0.0
+name: Release Android app
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install and sync web files
+        run: |
+          npm ci
+          npm run sync
+
+      - name: Build APK
+        working-directory: app/android
+        env:
+          VERSION_NAME: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/LG-TV-Remote-${VERSION_NAME}.apk"
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LG-TV-Remote-*.apk
+          body: |
+            Download **LG-TV-Remote-${{ github.ref_name }}.apk** below and open it on your Android phone.
+            First time: allow installs from your browser/Files app when Android asks.
+            In the app: Setup → Find TV on Wi-Fi → accept the prompt on the TV.
+
+      - name: Upload build (manual runs)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LG-TV-Remote-apk
+          path: LG-TV-Remote-*.apk

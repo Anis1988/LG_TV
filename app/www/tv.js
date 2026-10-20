@@ -3,28 +3,23 @@
 // sockets live in the native TvSocket plugin; this file speaks the webOS protocol.
 const Native = window.capacitorExports.registerPlugin("TvSocket");
 
+// No "signed" block: with one, the TV only grants the few permissions listed inside it
+// (that's why typing and alerts were refused). This is the list open-source LG remotes use.
 const MANIFEST = {
   manifestVersion: 1,
-  appVersion: "1.0",
-  signed: {
-    appId: "com.claude.tvremote",
-    vendorId: "com.claude",
-    created: "20261020",
-    localizedAppNames: { "": "TV Remote" },
-    localizedVendorNames: { "": "Claude" },
-    permissions: ["CONTROL_POWER", "READ_INSTALLED_APPS", "LAUNCH", "CONTROL_AUDIO",
-      "CONTROL_DISPLAY", "CONTROL_INPUT_TV", "READ_TV_CURRENT_TIME", "READ_CURRENT_CHANNEL"],
-    serial: "tvremote0001",
-  },
-  permissions: ["LAUNCH", "LAUNCH_WEBAPP", "APP_TO_APP", "CONTROL_AUDIO", "CONTROL_DISPLAY",
-    "CONTROL_INPUT_JOYSTICK", "CONTROL_INPUT_MEDIA_PLAYBACK", "CONTROL_INPUT_TV", "CONTROL_POWER",
-    "READ_APP_STATUS", "READ_CURRENT_CHANNEL", "READ_INPUT_DEVICE_LIST", "READ_INSTALLED_APPS",
-    "READ_RUNNING_APPS", "READ_TV_CHANNEL_LIST", "READ_POWER_STATE", "READ_COUNTRY_INFO",
-    "WRITE_NOTIFICATION_TOAST", "READ_NETWORK_STATE", "READ_UPDATE_INFO",
-    "CONTROL_MOUSE_AND_KEYBOARD", "CONTROL_TV_SCREEN", "READ_NOTIFICATIONS",
-    "WRITE_NOTIFICATION_ALERT", "CONTROL_INPUT_TEXT"],
-  signatures: [{ signatureVersion: 1, signature: "none" }],
+  appVersion: "1.1",
+  permissions: ["APP_TO_APP", "CLOSE", "CONTROL_AUDIO", "CONTROL_DISPLAY", "CONTROL_INPUT_JOYSTICK",
+    "CONTROL_INPUT_MEDIA_PLAYBACK", "CONTROL_INPUT_MEDIA_RECORDING", "CONTROL_INPUT_TEXT", "CONTROL_INPUT_TV",
+    "CONTROL_MOUSE_AND_KEYBOARD", "CONTROL_POWER", "CONTROL_TV_SCREEN", "LAUNCH", "LAUNCH_WEBAPP",
+    "READ_APP_STATUS", "READ_COUNTRY_INFO", "READ_CURRENT_CHANNEL", "READ_INPUT_DEVICE_LIST",
+    "READ_INSTALLED_APPS", "READ_LGE_SDX", "READ_LGE_TV_INPUT_EVENTS", "READ_NETWORK_STATE",
+    "READ_NOTIFICATIONS", "READ_POWER_STATE", "READ_RUNNING_APPS", "READ_SETTINGS", "READ_TV_CHANNEL_LIST",
+    "READ_TV_CURRENT_TIME", "READ_UPDATE_INFO", "SEARCH", "TEST_OPEN", "TEST_PROTECTED", "TEST_SECURE",
+    "UPDATE_FROM_REMOTE_APP", "WRITE_NOTIFICATION_ALERT", "WRITE_NOTIFICATION_TOAST", "WRITE_SETTINGS"],
 };
+// Bump when MANIFEST permissions change: a key from an older pairing keeps its old
+// permissions, so the app pairs again once (one Accept on the TV).
+const PAIR_VERSION = "2";
 
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -56,7 +51,12 @@ const TV = {
       Native.send({ id: "main", data: JSON.stringify({
         id: "register",
         type: "register",
-        payload: { forcePairing: false, pairingType: "PROMPT", "client-key": store.get("tvKey") || undefined, manifest: MANIFEST },
+        payload: {
+          forcePairing: false,
+          pairingType: "PROMPT",
+          "client-key": store.get("pairVersion") === PAIR_VERSION ? store.get("tvKey") || undefined : undefined,
+          manifest: MANIFEST,
+        },
       }) });
       // A TV in standby accepts the socket but never answers registration: that means "off".
       clearTimeout(this._regTimer);
@@ -100,21 +100,68 @@ const TV = {
       }
       if (msg.type === "registered") {
         store.set("tvKey", msg.payload["client-key"]);
+        store.set("pairVersion", PAIR_VERSION);
         clearTimeout(this._regTimer);
         this.pairing = false;
         this.ready = true;
         this.setPower("on");
+        this._registerKeyboard();
         this._syncNative();
         this.onChange();
         this._rememberMac();
       }
       return;
     }
+    const sub = this._subs.get(msg.id);
+    if (sub) { if (msg.type !== "error") sub(msg.payload || {}); return; }
     const p = this._pending.get(msg.id);
     if (!p) return;
     this._pending.delete(msg.id);
     if (msg.type === "error") p.reject(new Error(msg.error));
     else p.resolve(msg.payload || {});
+  },
+
+  // Subscriptions: the TV keeps sending updates on the same id.
+  _subs: new Map(),
+  subscribe(uri, onUpdate) {
+    const id = `sub_${this._next++}`;
+    this._subs.set(id, onUpdate);
+    Native.send({ id: "main", data: JSON.stringify({ id, type: "subscribe", uri }) }).catch(() => {});
+  },
+
+  // Registering as the TV's remote keyboard is what lets typed text through, and the TV
+  // then tells us whenever a text box gets or loses focus.
+  onKeyboardFocus: () => {},
+  _registerKeyboard() {
+    this._subs.clear();
+    this.subscribe("ssap://com.webos.service.ime/registerRemoteKeyboard", (p) => {
+      const w = p.currentWidget;
+      if (w && typeof w.focus === "boolean") this.onKeyboardFocus(w.focus);
+    });
+  },
+
+  // Undocumented but widely used: an alert whose close action is an internal (luna) call,
+  // closed right away. Gives access to TV services that have no public remote command.
+  async luna(uri, params = {}) {
+    const alert = await this.request("ssap://system.notifications/createAlert", {
+      message: " ",
+      buttons: [{ label: "", onClick: uri, params }],
+      onclose: { uri, params },
+      onfail: { uri, params },
+    });
+    await this.request("ssap://system.notifications/closeAlert", { alertId: alert.alertId });
+  },
+
+  // Connect the TV straight to a Bluetooth audio device it has paired with before.
+  async connectBluetooth(address) {
+    const a = address.toLowerCase();
+    await this.luna("luna://com.webos.service.bluetooth2/a2dp/connect", { address: a });
+    await new Promise((r) => setTimeout(r, 2500));
+    await this.setSoundOutput("bt_soundbar").catch(() => {});
+  },
+
+  phoneBluetoothDevices() {
+    return Native.bluetoothDevices().then((r) => r.devices || []);
   },
 
   // The TV can keep the socket open after turning off, so don't wait for it to close:
@@ -183,6 +230,23 @@ const TV = {
   },
   sendEnter() {
     return this.request("ssap://com.webos.service.ime/sendEnterKey");
+  },
+
+  async foregroundApp() {
+    const r = await this.request("ssap://com.webos.applicationManager/getForegroundAppInfo");
+    return r.appId || "";
+  },
+
+  // YouTube has its own on-screen keyboard that ignores remote typing, but it accepts a
+  // search link when started fresh (tested on an OLED C3: a running YouTube ignores it).
+  async searchYouTube(query) {
+    const id = "youtube.leanback.v4";
+    await this.request("ssap://system.launcher/close", { id }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 2000));
+    return this.request("ssap://system.launcher/launch", {
+      id,
+      params: { contentTarget: `https://www.youtube.com/tv#/search?q=${encodeURIComponent(query)}` },
+    });
   },
 
   // Sound output: TV speakers, soundbar (ARC/optical), Bluetooth...

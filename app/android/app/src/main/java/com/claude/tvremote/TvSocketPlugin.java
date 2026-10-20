@@ -1,6 +1,16 @@
 package com.claude.tvremote;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.content.Context;
+import android.os.Build;
+import com.getcapacitor.PermissionState;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Base64;
@@ -29,7 +39,10 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
 /** Gives the app's web page sockets to the TV, Wake-on-LAN, a Wi-Fi scan and hardware volume keys. */
-@CapacitorPlugin(name = "TvSocket")
+@CapacitorPlugin(
+    name = "TvSocket",
+    permissions = { @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT }) }
+)
 public class TvSocketPlugin extends Plugin {
     static volatile TvSocketPlugin instance;
 
@@ -89,6 +102,51 @@ public class TvSocketPlugin extends Plugin {
             activity.runOnUiThread(() -> activity.setThemeDark(dark));
         }
         call.resolve();
+    }
+
+    /**
+     * Audio devices paired with this phone (name + address). The TV needs the
+     * headphones' address to connect to them, and the phone is where we can read it.
+     */
+    @PluginMethod
+    public void bluetoothDevices(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 31 && getPermissionState("bluetooth") != PermissionState.GRANTED) {
+            requestPermissionForAlias("bluetooth", call, "bluetoothPermissionResult");
+            return;
+        }
+        listBluetooth(call);
+    }
+
+    @PermissionCallback
+    private void bluetoothPermissionResult(PluginCall call) {
+        if (getPermissionState("bluetooth") != PermissionState.GRANTED) {
+            call.reject("Bluetooth permission is needed to see your headphones");
+            return;
+        }
+        listBluetooth(call);
+    }
+
+    @SuppressLint("MissingPermission")
+    private void listBluetooth(PluginCall call) {
+        BluetoothManager bm = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+        BluetoothAdapter adapter = bm == null ? null : bm.getAdapter();
+        if (adapter == null) {
+            call.reject("This phone has no Bluetooth");
+            return;
+        }
+        JSArray list = new JSArray();
+        for (BluetoothDevice d : adapter.getBondedDevices()) {
+            BluetoothClass cls = d.getBluetoothClass();
+            boolean audio = cls != null && cls.getMajorDeviceClass() == BluetoothClass.Device.Major.AUDIO_VIDEO;
+            JSObject o = new JSObject();
+            o.put("name", d.getName() == null ? d.getAddress() : d.getName());
+            o.put("address", d.getAddress());
+            o.put("audio", audio);
+            list.put(o);
+        }
+        JSObject out = new JSObject();
+        out.put("devices", list);
+        call.resolve(out);
     }
 
     /** Installed version, e.g. "v1.6.0" for release builds (set from the git tag). */

@@ -180,6 +180,13 @@
   .opt-list button { display: flex; align-items: center; gap: 14px; padding: 0 16px; text-align: left; }
   .opt-list button svg { color: var(--accent-text); flex: none; }
   .opt-list button.on svg { color: #fff; }
+  .bt-text { display: flex; flex-direction: column; min-width: 0; }
+  .bt-text small { font-size: 12.5px; font-weight: 500; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt-list button.bt-btn { min-height: 64px; }
+  .bt-pick { display: none; max-height: 40vh; overflow-y: auto; }
+  .bt-pick.show { display: block; }
+  .link-btn { display: none; margin-top: 12px; text-align: center; }
+  .link-btn.show { display: block; }
   .cancel-sleep { display: none; margin-top: 12px; text-align: center; color: var(--bad); }
   .cancel-sleep.show { display: block; }
   .theme-btn:active { transform: scale(.94); }
@@ -549,7 +556,7 @@
 <div class="sheet glass" id="kbSheet" role="dialog" aria-label="Keyboard">
   <div class="grip"></div>
   <h3>Type on TV</h3>
-  <p class="note" style="margin:0 0 14px">Open a search box on the TV first, then type here. Letters appear on the TV as you type.</p>
+  <p class="note" style="margin:0 0 14px" id="kbHint">Select a search box on the TV, then type here — letters appear as you type.</p>
   <input class="field kb-field" id="kbInput" placeholder="Type to search…" autocomplete="off" autocapitalize="off" spellcheck="false">
   <div class="sheet-row">
     <button class="ghost" id="kbClear">Clear</button>
@@ -576,8 +583,14 @@
     <button data-out="tv_speaker"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg><span>TV speakers</span></button>
     <button data-out="external_arc"><svg viewBox="0 0 24 24"><rect x="2" y="9" width="20" height="6" rx="2"/><path d="M6 12h.01M18 12h.01"/></svg><span>Soundbar (HDMI ARC)</span></button>
     <button data-out="external_optical"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg><span>Optical</span></button>
-    <button data-out="bt_soundbar"><svg viewBox="0 0 24 24"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg><span>Bluetooth</span></button>
+    <button id="btBtn" class="bt-btn"><svg viewBox="0 0 24 24"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg><span class="bt-text"><span id="btLabel">Bluetooth headphones</span><small id="btSub">Tap to choose your headphones</small></span></button>
   </div>
+  <div id="btPickWrap" class="bt-pick">
+    <p class="label" style="margin:16px 0 8px 4px">Choose your headphones</p>
+    <div class="opt-list" id="btPick"></div>
+    <p class="note">These are the devices paired with this phone. Your headphones must be paired with both the TV and this phone (once).</p>
+  </div>
+  <button class="ghost link-btn" id="btChange">Change headphones</button>
 </div>
 <div class="toast glass" id="toast"></div>
 
@@ -913,7 +926,7 @@ function openSheet(id) {
   openSheetId = id;
   $(id).classList.add("show");
   $("scrim").classList.add("show");
-  if (id === "kbSheet") { kbLast = ""; $("kbInput").value = ""; setTimeout(() => $("kbInput").focus(), 250); }
+  if (id === "kbSheet") { kbLast = ""; $("kbInput").value = ""; setKbMode(); setTimeout(() => $("kbInput").focus(), 250); }
   if (id === "sleepSheet") renderSleep();
   if (id === "soundSheet") loadSound();
 }
@@ -940,10 +953,22 @@ document.querySelectorAll(".sheet").forEach((s) => {
   s.addEventListener("touchend", (e) => { if (y0 != null && e.changedTouches[0].clientY - y0 > 60) closeSheet(); y0 = null; });
 });
 
-/* Keyboard: mirror what's typed into the TV's focused text box */
+/* Keyboard: mirror what's typed into the TV's focused text box.
+   YouTube uses its own keyboard, so there we send the whole search instead. */
 let kbLast = "";
 let kbQueue = Promise.resolve();
+let kbMode = "live";
+async function setKbMode() {
+  let app = "";
+  try { app = await TV.foregroundApp(); } catch {}
+  kbMode = app.startsWith("youtube") ? "youtube" : "live";
+  $("kbHint").textContent = kbMode === "youtube"
+    ? "YouTube is open. Type what you want to watch, then tap Search YouTube."
+    : "Select a search box on the TV, then type here — letters appear as you type. For YouTube, open YouTube first.";
+  $("kbEnter").textContent = kbMode === "youtube" ? "Search YouTube" : "Search / Enter";
+}
 $("kbInput").addEventListener("input", () => {
+  if (kbMode === "youtube") return;
   const now = $("kbInput").value, before = kbLast;
   kbLast = now;
   kbQueue = kbQueue.then(async () => {
@@ -956,11 +981,19 @@ $("kbClear").onclick = () => {
   buzz();
   const n = kbLast.length;
   kbLast = ""; $("kbInput").value = "";
-  if (n) kbQueue = kbQueue.then(() => TV.deleteChars(n)).catch((e) => toast(e.message, true));
+  if (n && kbMode === "live") kbQueue = kbQueue.then(() => TV.deleteChars(n)).catch((e) => toast(e.message, true));
   $("kbInput").focus();
 };
 $("kbEnter").onclick = () => {
   buzz();
+  if (kbMode === "youtube") {
+    const q = $("kbInput").value.trim();
+    if (!q) { toast("Type something to search first", true); return; }
+    closeSheet();
+    toast(`Searching YouTube for “${q}”…`);
+    TV.searchYouTube(q).catch((e) => toast(e.message, true));
+    return;
+  }
   kbQueue = kbQueue.then(() => TV.sendEnter()).then(() => { closeSheet(); toast("Sent to TV"); }).catch((e) => toast(e.message, true));
 };
 $("kbInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("kbEnter").click(); } });
@@ -997,15 +1030,66 @@ $("sleepCancel").onclick = async () => { buzz(); await TV.cancelSleep(); toast("
 syncSleep();
 setInterval(syncSleep, 30000);
 
+/* Keyboard pops up by itself when a text box on the TV gets focus (while the app is open) */
+TV.onKeyboardFocus = (focused) => {
+  if (focused && !document.hidden && openSheetId !== "kbSheet") { showTab("remote"); openSheet("kbSheet"); }
+  else if (!focused && openSheetId === "kbSheet") closeSheet();
+};
+
+/* Bluetooth headphones: remember which ones, then one tap connects the TV to them */
+const loadBt = () => { try { return JSON.parse(localStorage.getItem("btDevice") || "null"); } catch { return null; } };
+let btDevice = loadBt();
+function renderBt(out) {
+  $("btLabel").textContent = btDevice ? btDevice.name : "Bluetooth headphones";
+  $("btSub").textContent = btDevice ? (out && out.startsWith("bt") ? "Connected · tap to reconnect" : "Tap to connect") : "Tap to choose your headphones";
+  $("btBtn").classList.toggle("on", !!out && out.startsWith("bt"));
+  $("btChange").classList.toggle("show", !!btDevice);
+}
+async function connectBt() {
+  toast(`Connecting to ${btDevice.name}…`);
+  try {
+    await TV.connectBluetooth(btDevice.address);
+    setTimeout(loadSound, 2500);
+  } catch (e) { toast("Couldn't connect: " + e.message, true); }
+}
+async function showBtPicker() {
+  $("btPick").innerHTML = '<p class="note">Loading…</p>';
+  $("btPickWrap").classList.add("show");
+  try {
+    const all = await TV.phoneBluetoothDevices();
+    const list = all.filter((d) => d.audio).length ? all.filter((d) => d.audio) : all;
+    $("btPick").innerHTML = list.length ? "" : '<p class="note">No paired devices found on this phone.</p>';
+    list.forEach((d) => {
+      const b = document.createElement("button");
+      b.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/></svg>';
+      const label = document.createElement("span"); label.textContent = d.name; b.appendChild(label);
+      b.onclick = () => {
+        buzz();
+        btDevice = { name: d.name, address: d.address };
+        try { localStorage.setItem("btDevice", JSON.stringify(btDevice)); } catch {}
+        $("btPickWrap").classList.remove("show");
+        renderBt("");
+        connectBt();
+      };
+      $("btPick").appendChild(b);
+    });
+  } catch (e) { $("btPick").innerHTML = ""; $("btPickWrap").classList.remove("show"); toast(e.message, true); }
+}
+$("btBtn").onclick = () => { buzz(); btDevice ? connectBt() : showBtPicker(); };
+$("btChange").onclick = () => { buzz(); showBtPicker(); };
+
 /* Sound output */
 async function loadSound() {
   document.querySelectorAll("#soundOpts button").forEach((b) => b.classList.remove("on"));
+  $("btPickWrap").classList.remove("show");
+  let out = "";
   try {
-    const out = await TV.soundOutput();
-    document.querySelectorAll("#soundOpts button").forEach((b) => b.classList.toggle("on", b.dataset.out === out));
+    out = await TV.soundOutput();
+    document.querySelectorAll("#soundOpts button[data-out]").forEach((b) => b.classList.toggle("on", b.dataset.out === out));
   } catch {}
+  renderBt(out);
 }
-document.querySelectorAll("#soundOpts button").forEach((b) => (b.onclick = async () => {
+document.querySelectorAll("#soundOpts button[data-out]").forEach((b) => (b.onclick = async () => {
   buzz();
   try {
     await TV.setSoundOutput(b.dataset.out);

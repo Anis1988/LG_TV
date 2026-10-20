@@ -40,6 +40,28 @@ public class TvSocketPlugin extends Plugin {
     @Override
     public void load() {
         instance = this;
+        SleepTimer.scheduleRefresh(getContext());
+    }
+
+    @PluginMethod
+    public void setSleepTimer(PluginCall call) {
+        int minutes = Math.max(1, Math.min(240, call.getInt("minutes", 30)));
+        JSObject out = new JSObject();
+        out.put("endsAt", SleepTimer.set(getContext(), minutes));
+        call.resolve(out);
+    }
+
+    @PluginMethod
+    public void cancelSleepTimer(PluginCall call) {
+        SleepTimer.cancel(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void getSleepTimer(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("endsAt", SleepTimer.endsAt(getContext()));
+        call.resolve(out);
     }
 
     /** Called by MainActivity; returns true if the key press was sent to the TV instead. */

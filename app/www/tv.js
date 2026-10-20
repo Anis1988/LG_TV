@@ -77,7 +77,13 @@ const TV = {
   setPower(p) {
     if (p === this.power) return;
     this.power = p;
-    Native.updateWidget({ state: p }).catch(() => {});
+    this.pushWidget();
+  },
+
+  // Send the current state to the home-screen widget and Quick Settings tile.
+  pushWidget() {
+    if (this.power === "unknown") return;
+    Native.updateWidget({ state: this.power }).catch(() => {});
   },
 
   _onMessage({ id, data }) {
@@ -166,6 +172,39 @@ const TV = {
       const mac = info.wiredInfo?.macAddress || info.wifiInfo?.macAddress;
       if (mac) { store.set("tvMac", mac); this._syncNative(); }
     } catch {}
+  },
+
+  // Keyboard: types into whatever text box is focused on the TV.
+  insertText(text) {
+    return this.request("ssap://com.webos.service.ime/insertText", { text, replace: 0 });
+  },
+  deleteChars(count) {
+    return this.request("ssap://com.webos.service.ime/deleteCharacters", { count });
+  },
+  sendEnter() {
+    return this.request("ssap://com.webos.service.ime/sendEnterKey");
+  },
+
+  // Sound output: TV speakers, soundbar (ARC/optical), Bluetooth...
+  async soundOutput() {
+    const r = await this.request("ssap://audio/getSoundOutput");
+    return r.soundOutput || "";
+  },
+  setSoundOutput(output) {
+    return this.request("ssap://audio/changeSoundOutput", { output });
+  },
+
+  // Sleep timer lives in native code so it fires even with the app closed.
+  async sleepEndsAt() {
+    const { endsAt } = await Native.getSleepTimer();
+    return endsAt || 0;
+  },
+  async setSleep(minutes) {
+    const { endsAt } = await Native.setSleepTimer({ minutes });
+    return endsAt;
+  },
+  cancelSleep() {
+    return Native.cancelSleepTimer();
   },
 
   async appVersion() {

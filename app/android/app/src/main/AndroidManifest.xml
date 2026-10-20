@@ -36,6 +36,24 @@
                 android:resource="@xml/tv_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".BackgroundReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".TvTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_tv"
+            android:label="LG TV"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

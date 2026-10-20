@@ -213,15 +213,23 @@ final class TvClient {
      * open (with "Turn on via Wi-Fi") but never registers, which is how "off" is told apart.
      */
     String powerState() {
-        if (connect(3000)) {
+        // Two tries: a kept-alive connection can outlive the TV turning off, so if it
+        // doesn't answer, drop it and check again with a fresh one.
+        for (int attempt = 0; attempt < 2; attempt++) {
+            if (!connect(3500)) return lastOpened ? "off" : "unreachable";
             try {
                 String s = request("ssap://com.webos.service.tvpower/power/getPowerState", null).optString("state", "");
                 if (s.matches("(?i).*(screen ?off|active standby).*")) return "screen_off";
-                if (s.matches("(?i).*(suspend|power ?off|standby).*")) return "off";
-            } catch (Exception ignored) {}
-            return "on";
+                if (s.matches("(?i).*(suspend|power ?off|standby).*")) {
+                    disconnect();
+                    return "off";
+                }
+                return "on";
+            } catch (Exception e) {
+                disconnect();
+            }
         }
-        return lastOpened ? "off" : "unreachable";
+        return "unreachable";
     }
 
     /** Like powerState() but without a fresh connect; for use right after a failed command. */

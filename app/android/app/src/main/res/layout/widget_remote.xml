@@ -63,6 +63,16 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Sleep timer: tap for 30 min, tap again to cancel -->
+        <ImageButton
+            android:id="@+id/w_sleep"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/widget_btn_round"
+            android:contentDescription="Sleep timer"
+            android:src="@drawable/wi_sleep" />
+
         <!-- ON/OFF power switch: the track drawable moves the knob; one label shows at a time -->
         <FrameLayout
             android:id="@+id/w_power"

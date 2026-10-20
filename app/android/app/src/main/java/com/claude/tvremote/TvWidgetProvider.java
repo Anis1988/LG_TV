@@ -31,14 +31,27 @@ public class TvWidgetProvider extends AppWidgetProvider {
     private static final int[] IDS = {
         R.id.w_power, R.id.w_up, R.id.w_down, R.id.w_left, R.id.w_right, R.id.w_ok,
         R.id.w_back, R.id.w_home, R.id.w_volup, R.id.w_voldown, R.id.w_mute, R.id.w_status_row,
+        R.id.w_sleep,
     };
     private static final String[] CMDS = {
         "POWER", "UP", "DOWN", "LEFT", "RIGHT", "ENTER",
         "BACK", "HOME", "VOLUP", "VOLDOWN", "MUTE", "STATUS",
+        "SLEEP",
     };
 
     @Override
+    public void onEnabled(Context ctx) {
+        SleepTimer.scheduleRefresh(ctx);
+    }
+
+    @Override
+    public void onDisabled(Context ctx) {
+        SleepTimer.cancelRefresh(ctx);
+    }
+
+    @Override
     public void onUpdate(Context ctx, AppWidgetManager mgr, int[] widgetIds) {
+        SleepTimer.scheduleRefresh(ctx);
         for (int id : widgetIds) mgr.updateAppWidget(id, build(ctx));
         // Placed, or the 30-minute refresh: check whether the TV is on.
         PendingResult result = goAsync();
@@ -62,8 +75,19 @@ public class TvWidgetProvider extends AppWidgetProvider {
         Intent open = new Intent(ctx, MainActivity.class);
         v.setOnClickPendingIntent(R.id.w_name, PendingIntent.getActivity(ctx, 100, open, PendingIntent.FLAG_IMMUTABLE));
         SharedPreferences prefs = prefs(ctx);
-        applyState(v, prefs.getString("widgetState", "unknown"), prefs.getString("widgetText", null));
+        applyState(ctx, v, prefs.getString("widgetState", "unknown"), prefs.getString("widgetText", null));
         return v;
+    }
+
+    /** Re-renders with the last known state (e.g. after the sleep timer changes). */
+    static void redraw(Context ctx) {
+        AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
+        int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, TvWidgetProvider.class));
+        if (ids.length == 0) return;
+        SharedPreferences prefs = prefs(ctx);
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_remote);
+        applyState(ctx, v, prefs.getString("widgetState", "unknown"), prefs.getString("widgetText", null));
+        mgr.partiallyUpdateAppWidget(ids, v);
     }
 
     private static SharedPreferences prefs(Context ctx) {
@@ -108,6 +132,15 @@ public class TvWidgetProvider extends AppWidgetProvider {
             switch (cmd) {
                 case "STATUS":
                     return new String[] { tv.powerState(), null };
+                case "SLEEP": {
+                    String current = prefs(ctx).getString("widgetState", "unknown");
+                    if (SleepTimer.endsAt(ctx) > 0) {
+                        SleepTimer.cancel(ctx);
+                        return new String[] { current, "Sleep timer off" };
+                    }
+                    SleepTimer.set(ctx, 30);
+                    return new String[] { current, null };
+                }
                 case "POWER":
                     if (tv.connect(2500)) {
                         tv.request("ssap://system/turnOff", null);
@@ -168,8 +201,19 @@ public class TvWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private static void applyState(RemoteViews v, String state, String text) {
-        v.setTextViewText(R.id.w_status, text != null ? text : label(state));
+    private static String clock(Context ctx, long at) {
+        return android.text.format.DateFormat.getTimeFormat(ctx).format(new java.util.Date(at));
+    }
+
+    private static void applyState(Context ctx, RemoteViews v, String state, String text) {
+        long sleepAt = SleepTimer.endsAt(ctx);
+        long checkedAt = prefs(ctx).getLong("widgetCheckedAt", 0);
+        String line = text != null ? text : label(state);
+        // Add when the TV goes to sleep, or else when it was last checked, so a stale status is obvious.
+        if (sleepAt > 0 && !"off".equals(state)) line += " · sleeps " + clock(ctx, sleepAt);
+        else if (text == null && checkedAt > 0 && !"checking".equals(state)) line += " · " + clock(ctx, checkedAt);
+        v.setTextViewText(R.id.w_status, line);
+        v.setImageViewResource(R.id.w_sleep, sleepAt > 0 ? R.drawable.wi_sleep_on : R.drawable.wi_sleep);
         int dot;
         switch (state) {
             case "on": dot = R.drawable.w_dot_on; break;
@@ -192,13 +236,15 @@ public class TvWidgetProvider extends AppWidgetProvider {
     /** Updates every widget's status; also used by the app when it knows the state. */
     static void showState(Context ctx, String state, String text) {
         if (!"checking".equals(state)) {
-            prefs(ctx).edit().putString("widgetState", state).putString("widgetText", text).apply();
+            prefs(ctx).edit().putString("widgetState", state).putString("widgetText", text)
+                .putLong("widgetCheckedAt", System.currentTimeMillis()).apply();
+            TvTileService.requestUpdate(ctx);
         }
         AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
         int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, TvWidgetProvider.class));
         if (ids.length == 0) return;
         RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_remote);
-        applyState(v, state, text);
+        applyState(ctx, v, state, text);
         mgr.partiallyUpdateAppWidget(ids, v);
     }
 

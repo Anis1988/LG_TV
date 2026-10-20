@@ -3,6 +3,7 @@ package com.claude.tvremote;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.KeyEvent;
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -14,6 +15,19 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TvSocketPlugin.class);
         super.onCreate(savedInstanceState);
         applySystemBars();
+
+        // Back: let the page close a panel or return to the Remote tab first; only leave when it says so.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                getBridge().getWebView().evaluateJavascript("window.appBack ? window.appBack() : false", handled -> {
+                    if ("true".equals(handled)) return;
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                    setEnabled(true);
+                });
+            }
+        });
     }
 
     // The activity handles uiMode changes itself, so re-color the system bars when light/dark flips.

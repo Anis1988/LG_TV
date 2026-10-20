@@ -149,7 +149,39 @@
   body.tv-off .aurora, body.tv-off .grid-floor { filter: grayscale(1); opacity: .2; }
   body::after { content: ""; position: fixed; inset: 0; z-index: 50; pointer-events: none; border-radius: 28px; opacity: 0; transition: opacity .5s; box-shadow: inset 0 0 0 2px rgba(61,220,151,.75), inset 0 0 28px rgba(61,220,151,.35); }
   body.tv-on::after { opacity: 1; }
-  .theme-btn { height: 48px; padding: 0 14px; border-radius: 24px; display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; transition: transform .1s; }
+  .theme-btn { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; transition: transform .1s; }
+
+  /* Sleep timer chip in the status card */
+  .sleep-chip { display: none; align-self: flex-start; margin-top: 6px; padding: 4px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700; color: #b77900; background: color-mix(in srgb, #ffb020 20%, transparent); }
+  :root:not([data-theme="light"]) .sleep-chip { color: #ffc65a; }
+  .sleep-chip.show { display: inline-block; }
+  .q.active { border-color: color-mix(in srgb, #ffb020 60%, transparent); }
+  .q.active svg { color: #ffb020; }
+
+  /* Bottom sheets */
+  .scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .25s; }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; z-index: 21; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 560px;
+    padding: 10px 18px calc(env(safe-area-inset-bottom) + 22px);
+    border-radius: 28px 28px 0 0; background: var(--toast-bg);
+    transform: translateY(105%); transition: transform .3s cubic-bezier(.2,.8,.2,1);
+  }
+  .sheet.show { transform: translateY(0); }
+  .sheet h3 { margin: 6px 0 6px; font-size: 19px; }
+  .grip { width: 44px; height: 5px; border-radius: 3px; background: var(--edge-hi); margin: 0 auto 8px; }
+  .kb-field { width: 100%; font-size: 18px; padding: 16px; margin-bottom: 12px; }
+  .sheet-row { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+  .sheet-row .ghost { text-align: center; }
+  .opt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .opt-grid button, .opt-list button { min-height: 56px; border-radius: 16px; background: var(--glass); border: 1px solid var(--edge-hi); font-weight: 700; font-size: 15px; }
+  .opt-grid button.on, .opt-list button.on { color: #fff; background: var(--grad); border-color: transparent; }
+  .opt-list { display: flex; flex-direction: column; gap: 10px; }
+  .opt-list button { display: flex; align-items: center; gap: 14px; padding: 0 16px; text-align: left; }
+  .opt-list button svg { color: var(--accent-text); flex: none; }
+  .opt-list button.on svg { color: #fff; }
+  .cancel-sleep { display: none; margin-top: 12px; text-align: center; color: var(--bad); }
+  .cancel-sleep.show { display: block; }
   .theme-btn:active { transform: scale(.94); }
   .theme-btn svg { color: var(--accent-text); }
   .seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 16px; background: var(--field); border: 1px solid var(--edge); }
@@ -338,7 +370,7 @@
         <small><span class="dot" id="dot"></span><span id="state">Connecting…</span></small>
       </div>
     </div>
-    <button class="theme-btn glass" id="themeBtn" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" id="themeIcon"></svg><span id="themeLabel">Auto</span></button>
+    <button class="theme-btn glass" id="themeBtn" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" id="themeIcon"></svg></button>
     <button class="pswitch" id="power" role="switch" aria-checked="false" aria-label="TV power"><span class="lbl" id="powerLbl">OFF</span><span class="knob"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M17.7 6.3a8 8 0 1 1-11.4 0"/></svg></span></button>
   </header>
 
@@ -356,16 +388,16 @@
     <section class="page show" data-page="remote">
       <div class="now glass offline" id="now">
         <div class="art" id="nowArt"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/></svg></div>
-        <div class="meta"><b id="nowTitle">Not connected</b><span id="nowSub">Open Setup to pick your TV</span></div>
+        <div class="meta"><b id="nowTitle">Not connected</b><span id="nowSub">Open Setup to pick your TV</span><span class="sleep-chip" id="sleepChip"></span></div>
         <div class="eq"><i></i><i></i><i></i><i></i></div>
         <span class="badge" id="powerBadge"></span>
       </div>
 
       <div class="quick">
         <button class="q glass" id="mute"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>Mute</button>
-        <button class="q glass" data-act="screenOff"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Screen off</button>
-        <button class="q glass" data-goto="inputs"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7"/></svg>Input</button>
-        <button class="q glass" data-btn="MENU"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</button>
+        <button class="q glass" data-sheet="kbSheet"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>Keyboard</button>
+        <button class="q glass" data-sheet="sleepSheet" id="sleepBtn"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Sleep</button>
+        <button class="q glass" data-sheet="soundSheet"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="14" r="3.5"/><path d="M12 7h.01"/></svg>Sound</button>
       </div>
 
       <div class="vol glass">
@@ -443,11 +475,19 @@
       <div class="apps" id="apps"></div>
     </section>
 
-    <!-- Inputs + message -->
-    <section class="page" data-page="inputs">
+    <!-- More: inputs, TV controls, message -->
+    <section class="page" data-page="more">
       <div class="card glass">
         <p class="label">Inputs</p>
         <div class="chips" id="inputs"></div>
+      </div>
+      <div class="card glass">
+        <p class="label">TV controls</p>
+        <div class="chips">
+          <button class="chip" data-act="screenOff"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Screen off</button>
+          <button class="chip" data-btn="MENU"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>TV settings</button>
+        </div>
+        <p class="note">Screen off keeps the sound playing — handy for music.</p>
       </div>
       <div class="card glass">
         <p class="label">Message on TV</p>
@@ -488,7 +528,8 @@
       </div>
       <div class="card glass">
         <p class="label">Home-screen widget</p>
-        <p class="note" style="margin:0">Long-press your home screen → <b>Widgets</b> → <b>TV Remote</b>. It has power, arrows, OK, back, home and volume — no need to open the app. Stretch it bigger and the buttons grow too.</p>
+        <p class="note" style="margin:0">Long-press your home screen → <b>Widgets</b> → <b>TV Remote</b>. It has power, arrows, OK, back, home, volume and a moon button for a 30-min sleep timer. Stretch it bigger and the buttons grow too.</p>
+        <p class="note">Quick Settings tile: pull down twice from the top → tap the pencil (edit) → drag <b>LG TV</b> into your tiles.</p>
       </div>
     </section>
   </div>
@@ -498,9 +539,46 @@
   <div class="indicator" id="indicator"></div>
   <button class="on" data-tab="remote"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>Remote</button>
   <button data-tab="apps"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>Apps</button>
-  <button data-tab="inputs"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>Inputs</button>
+  <button data-tab="more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>More</button>
   <button data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Setup</button>
 </nav>
+
+<!-- Bottom sheets (one open at a time) -->
+<div class="scrim" id="scrim"></div>
+
+<div class="sheet glass" id="kbSheet" role="dialog" aria-label="Keyboard">
+  <div class="grip"></div>
+  <h3>Type on TV</h3>
+  <p class="note" style="margin:0 0 14px">Open a search box on the TV first, then type here. Letters appear on the TV as you type.</p>
+  <input class="field kb-field" id="kbInput" placeholder="Type to search…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="sheet-row">
+    <button class="ghost" id="kbClear">Clear</button>
+    <button class="primary" id="kbEnter">Search / Enter</button>
+  </div>
+</div>
+
+<div class="sheet glass" id="sleepSheet" role="dialog" aria-label="Sleep timer">
+  <div class="grip"></div>
+  <h3>Sleep timer</h3>
+  <p class="note" style="margin:0 0 14px" id="sleepStatus">The TV turns itself off after the time you pick — even if this app is closed.</p>
+  <div class="opt-grid" id="sleepOpts">
+    <button data-min="15">15 min</button><button data-min="30">30 min</button><button data-min="45">45 min</button>
+    <button data-min="60">1 hour</button><button data-min="90">1½ hours</button><button data-min="120">2 hours</button>
+  </div>
+  <button class="ghost cancel-sleep" id="sleepCancel">Cancel timer</button>
+</div>
+
+<div class="sheet glass" id="soundSheet" role="dialog" aria-label="Sound output">
+  <div class="grip"></div>
+  <h3>Sound output</h3>
+  <p class="note" style="margin:0 0 14px">Where the TV's sound plays.</p>
+  <div class="opt-list" id="soundOpts">
+    <button data-out="tv_speaker"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg><span>TV speakers</span></button>
+    <button data-out="external_arc"><svg viewBox="0 0 24 24"><rect x="2" y="9" width="20" height="6" rx="2"/><path d="M6 12h.01M18 12h.01"/></svg><span>Soundbar (HDMI ARC)</span></button>
+    <button data-out="external_optical"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg><span>Optical</span></button>
+    <button data-out="bt_soundbar"><svg viewBox="0 0 24 24"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg><span>Bluetooth</span></button>
+  </div>
+</div>
 <div class="toast glass" id="toast"></div>
 
 <script src="capacitor.js"></script>
@@ -530,7 +608,7 @@ async function act(action, body, done) {
 const press = (name) => act("button", { name });
 
 /* Tabs with sliding indicator */
-const TABS = ["remote", "apps", "inputs", "settings"];
+const TABS = ["remote", "apps", "more", "settings"];
 function showTab(name) {
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("show", p.dataset.page === name));
@@ -806,7 +884,7 @@ function applyTheme() {
   const light = themePref === "light" || (themePref === "auto" && systemLight.matches);
   document.documentElement.dataset.theme = light ? "light" : "dark";
   $("themeIcon").innerHTML = THEME_ICONS[themePref];
-  $("themeLabel").textContent = THEME_NAMES[themePref];
+  $("themeBtn").setAttribute("aria-label", `Theme: ${THEME_NAMES[themePref]}`);
   document.querySelectorAll("[data-theme-set]").forEach((b) => b.classList.toggle("on", b.dataset.themeSet === themePref));
   TV.setSystemBars(!light);
 }
@@ -827,6 +905,114 @@ $("themeBtn").onclick = () => {
 };
 systemLight.addEventListener("change", applyTheme);
 applyTheme();
+
+/* Bottom sheets */
+let openSheetId = null;
+function openSheet(id) {
+  closeSheet();
+  openSheetId = id;
+  $(id).classList.add("show");
+  $("scrim").classList.add("show");
+  if (id === "kbSheet") { kbLast = ""; $("kbInput").value = ""; setTimeout(() => $("kbInput").focus(), 250); }
+  if (id === "sleepSheet") renderSleep();
+  if (id === "soundSheet") loadSound();
+}
+function closeSheet() {
+  if (!openSheetId) return;
+  $(openSheetId).classList.remove("show");
+  $("scrim").classList.remove("show");
+  if (openSheetId === "kbSheet") $("kbInput").blur();
+  openSheetId = null;
+}
+$("scrim").onclick = closeSheet;
+// Called by the phone's Back button: close a panel, then go back to Remote, then let the app exit.
+window.appBack = () => {
+  if (openSheetId) { closeSheet(); return true; }
+  const tab = document.querySelector("nav button.on")?.dataset.tab;
+  if (tab && tab !== "remote") { showTab("remote"); return true; }
+  return false;
+};
+document.querySelectorAll("[data-sheet]").forEach((b) => (b.onclick = () => { buzz(6); openSheet(b.dataset.sheet); }));
+// Swipe a sheet down to close it
+document.querySelectorAll(".sheet").forEach((s) => {
+  let y0 = null;
+  s.addEventListener("touchstart", (e) => { if (e.target.closest("input")) return; y0 = e.touches[0].clientY; }, { passive: true });
+  s.addEventListener("touchend", (e) => { if (y0 != null && e.changedTouches[0].clientY - y0 > 60) closeSheet(); y0 = null; });
+});
+
+/* Keyboard: mirror what's typed into the TV's focused text box */
+let kbLast = "";
+let kbQueue = Promise.resolve();
+$("kbInput").addEventListener("input", () => {
+  const now = $("kbInput").value, before = kbLast;
+  kbLast = now;
+  kbQueue = kbQueue.then(async () => {
+    if (now.startsWith(before)) { if (now.length > before.length) await TV.insertText(now.slice(before.length)); }
+    else if (before.startsWith(now)) await TV.deleteChars(before.length - now.length);
+    else { await TV.deleteChars(before.length); if (now) await TV.insertText(now); }
+  }).catch((e) => toast(e.message, true));
+});
+$("kbClear").onclick = () => {
+  buzz();
+  const n = kbLast.length;
+  kbLast = ""; $("kbInput").value = "";
+  if (n) kbQueue = kbQueue.then(() => TV.deleteChars(n)).catch((e) => toast(e.message, true));
+  $("kbInput").focus();
+};
+$("kbEnter").onclick = () => {
+  buzz();
+  kbQueue = kbQueue.then(() => TV.sendEnter()).then(() => { closeSheet(); toast("Sent to TV"); }).catch((e) => toast(e.message, true));
+};
+$("kbInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("kbEnter").click(); } });
+
+/* Sleep timer */
+let sleepAt = 0;
+const fmtTime = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+async function syncSleep() {
+  try { sleepAt = await TV.sleepEndsAt(); } catch { sleepAt = 0; }
+  const on = sleepAt > Date.now();
+  $("sleepChip").textContent = on ? `🌙 Sleeps at ${fmtTime(sleepAt)}` : "";
+  $("sleepChip").classList.toggle("show", on);
+  $("sleepBtn").classList.toggle("active", on);
+  if (openSheetId === "sleepSheet") renderSleep();
+}
+function renderSleep() {
+  const on = sleepAt > Date.now();
+  const left = Math.max(1, Math.round((sleepAt - Date.now()) / 60000));
+  $("sleepStatus").textContent = on
+    ? `The TV turns off at ${fmtTime(sleepAt)} (in ${left} min). Pick a new time or cancel.`
+    : "The TV turns itself off after the time you pick — even if this app is closed.";
+  $("sleepCancel").classList.toggle("show", on);
+}
+document.querySelectorAll("#sleepOpts button").forEach((b) => (b.onclick = async () => {
+  buzz();
+  try {
+    sleepAt = await TV.setSleep(+b.dataset.min);
+    toast(`TV will turn off at ${fmtTime(sleepAt)}`);
+    closeSheet();
+    syncSleep();
+  } catch (e) { toast(e.message, true); }
+}));
+$("sleepCancel").onclick = async () => { buzz(); await TV.cancelSleep(); toast("Sleep timer off"); closeSheet(); syncSleep(); };
+syncSleep();
+setInterval(syncSleep, 30000);
+
+/* Sound output */
+async function loadSound() {
+  document.querySelectorAll("#soundOpts button").forEach((b) => b.classList.remove("on"));
+  try {
+    const out = await TV.soundOutput();
+    document.querySelectorAll("#soundOpts button").forEach((b) => b.classList.toggle("on", b.dataset.out === out));
+  } catch {}
+}
+document.querySelectorAll("#soundOpts button").forEach((b) => (b.onclick = async () => {
+  buzz();
+  try {
+    await TV.setSoundOutput(b.dataset.out);
+    document.querySelectorAll("#soundOpts button").forEach((x) => x.classList.toggle("on", x === b));
+    toast(`Sound: ${b.querySelector("span").textContent}`);
+  } catch (e) { toast("That output isn't available on this TV", true); }
+}));
 
 /* Update banner: compare this install with the latest GitHub release */
 const RELEASES = "https://api.github.com/repos/Anis1988/LG_TV/releases/latest";
@@ -880,7 +1066,14 @@ if (!TV.ip) showTab("settings");
 TV.start();
 refresh();
 setInterval(refresh, 4000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { if (!TV.ready) TV.start(); refresh(); } });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (!TV.ready) TV.start();
+  refresh().then(() => TV.pushWidget());
+  syncSleep();
+});
+// While the app is open it has the freshest view; keep the widget and tile in step.
+setInterval(() => { if (!document.hidden) TV.pushWidget(); }, 5 * 60 * 1000);
 </script>
 </body>
 </html>

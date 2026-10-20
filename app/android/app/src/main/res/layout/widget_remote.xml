@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <!-- Header: name + status, power -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/w_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="LG TV"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/w_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:text="Tap to control"
+                android:textColor="#A6E6F0FF"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/w_power"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/widget_btn_power"
+            android:contentDescription="Power"
+            android:src="@drawable/ic_w_power" />
+    </LinearLayout>
+
+    <!-- Body: volume | d-pad | back/home -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="6dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_pill"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="2dp">
+
+            <ImageButton
+                android:id="@+id/w_volup"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/widget_btn"
+                android:contentDescription="Volume up"
+                android:src="@drawable/ic_w_plus" />
+
+            <ImageButton
+                android:id="@+id/w_mute"
+                android:layout_width="40dp"
+                android:layout_height="36dp"
+                android:background="@drawable/widget_btn"
+                android:contentDescription="Mute"
+                android:src="@drawable/ic_w_mute" />
+
+            <ImageButton
+                android:id="@+id/w_voldown"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/widget_btn"
+                android:contentDescription="Volume down"
+                android:src="@drawable/ic_w_minus" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/w_up"
+                android:layout_width="42dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_btn"
+                android:contentDescription="Up"
+                android:src="@drawable/ic_w_up" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/w_left"
+                    android:layout_width="38dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/widget_btn"
+                    android:contentDescription="Left"
+                    android:src="@drawable/ic_w_left" />
+
+                <TextView
+                    android:id="@+id/w_ok"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/widget_btn_ok"
+                    android:gravity="center"
+                    android:text="OK"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/w_right"
+                    android:layout_width="38dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/widget_btn"
+                    android:contentDescription="Right"
+                    android:src="@drawable/ic_w_right" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/w_down"
+                android:layout_width="42dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_btn"
+                android:contentDescription="Down"
+                android:src="@drawable/ic_w_down" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_pill"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="2dp">
+
+            <ImageButton
+                android:id="@+id/w_back"
+                android:layout_width="40dp"
+                android:layout_height="44dp"
+                android:background="@drawable/widget_btn"
+                android:contentDescription="Back"
+                android:src="@drawable/ic_w_back" />
+
+            <ImageButton
+                android:id="@+id/w_home"
+                android:layout_width="40dp"
+                android:layout_height="44dp"
+                android:background="@drawable/widget_btn"
+                android:contentDescription="Home"
+                android:src="@drawable/ic_w_home" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

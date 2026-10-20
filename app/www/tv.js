@@ -77,6 +77,7 @@ const TV = {
         store.set("tvKey", msg.payload["client-key"]);
         this.pairing = false;
         this.ready = true;
+        this._syncNative();
         this.onChange();
         this._rememberMac();
       }
@@ -112,9 +113,13 @@ const TV = {
   // Remote buttons go through a separate pointer socket.
   async button(name) {
     if (!this._pointerOpen) {
-      const { socketPath } = await this.request("ssap://com.webos.service.networkinput/getPointerInputSocket");
-      await Native.open({ id: "pointer", url: socketPath });
-      this._pointerOpen = true;
+      // Share one open attempt between quick repeated taps.
+      this._pointerOpening ??= (async () => {
+        const { socketPath } = await this.request("ssap://com.webos.service.networkinput/getPointerInputSocket");
+        await Native.open({ id: "pointer", url: socketPath });
+        this._pointerOpen = true;
+      })().finally(() => { this._pointerOpening = null; });
+      await this._pointerOpening;
     }
     await Native.send({ id: "pointer", data: `type:button\nname:${name}\n\n` });
   },
@@ -124,8 +129,23 @@ const TV = {
     try {
       const info = await this.request("ssap://com.webos.service.connectionmanager/getinfo");
       const mac = info.wiredInfo?.macAddress || info.wifiInfo?.macAddress;
-      if (mac) store.set("tvMac", mac);
+      if (mac) { store.set("tvMac", mac); this._syncNative(); }
     } catch {}
+  },
+
+  // Phone volume keys go to the TV only while connected.
+  setVolumeKeys(enabled) {
+    Native.setVolumeKeys({ enabled: !!enabled }).catch(() => {});
+  },
+
+  // The home-screen widget reads the TV address and key from native storage.
+  _syncNative() {
+    Native.saveConfig({
+      ip: this.ip,
+      key: store.get("tvKey") || "",
+      mac: store.get("tvMac") || "",
+      manifest: JSON.stringify(MANIFEST),
+    }).catch(() => {});
   },
 
   wake() {
@@ -219,6 +239,8 @@ TV.run = function (action, body = {}) {
   }
 };
 
+TV.onHwKey = () => {};
 Native.addListener("message", (e) => TV._onMessage(e));
 Native.addListener("closed", (e) => TV._onClosed(e));
+Native.addListener("hwkey", (e) => TV.onHwKey(e.key));
 window.TV = TV;

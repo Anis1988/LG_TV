@@ -18,6 +18,11 @@ cd android && gradlew assembleDebug
 APK lands in `app/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 First launch: open **Setup**, tap **Find TV on Wi-Fi** (or type the IP), then accept the prompt on the TV.
+
+Features: glass UI with the D-pad in thumb reach, swipe-pad mode, hold-to-repeat, phone volume keys control the TV,
+and a home-screen widget (power, arrows, OK, back, home, volume, mute) that works without opening the app.
+
+Releases: pushing a `v*` tag builds the APK on GitHub Actions and attaches it to a GitHub Release.
 For power-on, enable *Settings → General → Devices → TV Management → Turn on via Wi-Fi* on the TV.
 
 ## PC dashboard

@@ -4,4 +4,5 @@
     <string name="title_activity_main">TV Remote</string>
     <string name="package_name">com.claude.tvremote</string>
     <string name="custom_url_scheme">com.claude.tvremote</string>
+    <string name="widget_description">Power, arrows, OK and volume for your LG TV</string>
 </resources>

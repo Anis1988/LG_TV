@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>TV Remote</title>
+<script>
+  // Pick the theme before first paint so there's no flash
+  (function () {
+    var pref; try { pref = localStorage.getItem("theme"); } catch (e) {}
+    var light = pref === "light" || (pref !== "dark" && matchMedia("(prefers-color-scheme: light)").matches);
+    document.documentElement.dataset.theme = light ? "light" : "dark";
+  })();
+</script>
 <style>
   /* Dark theme (default) */
   :root {
@@ -34,13 +42,13 @@
     --orb3: rgba(255,107,213,.35);
     --floor: rgba(94,231,255,.6);
     --floor-op: .18;
+    --ok-bg: #121626;
     --grad: linear-gradient(135deg, var(--cyan), var(--violet) 55%, var(--pink));
     --blur: blur(22px) saturate(170%);
     --nav-h: 74px;
   }
-  /* Light theme follows the phone setting */
-  @media (prefers-color-scheme: light) {
-    :root {
+  /* Light theme: set by the theme switch (Auto follows the phone) */
+  :root[data-theme="light"] {
       --bg: #eaeef7;
       --text: #121626;
       --muted: #535c74;
@@ -67,7 +75,7 @@
       --orb3: rgba(233,79,174,.22);
       --floor: rgba(108,92,255,.5);
       --floor-op: .12;
-    }
+      --ok-bg: #f4f6fb;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -126,6 +134,13 @@
   .power { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--bad) 25%, transparent); transition: transform .1s; }
   .power.off { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--good) 25%, transparent); }
   .power:active { transform: scale(.92); }
+  .theme-btn { height: 48px; padding: 0 14px; border-radius: 24px; display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; transition: transform .1s; }
+  .theme-btn:active { transform: scale(.94); }
+  .theme-btn svg { color: var(--accent-text); }
+  .seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 16px; background: var(--field); border: 1px solid var(--edge); }
+  .seg3 button { min-height: 48px; border-radius: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .seg3 button.on { background: var(--glass-hi); color: var(--text); box-shadow: inset 0 1px 0 var(--inset-hi), 0 2px 10px rgba(0,0,0,.12); }
+  .seg3 button.on svg { color: var(--accent-text); }
 
   /* Pages */
   .pages { flex: 1; min-height: 0; position: relative; }
@@ -183,25 +198,26 @@
   .pad-wrap { display: grid; place-items: center; }
   .dpad { position: relative; width: 100%; max-width: 236px; aspect-ratio: 1; }
   .pad-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; stroke: none; filter: drop-shadow(0 14px 28px rgba(0,0,0,.28)); }
-  .pad-svg .base { fill: var(--glass); stroke: var(--edge-hi); stroke-width: 1; }
-  .pad-svg .seg { fill: url(#segFill); stroke: var(--edge-hi); stroke-width: 1; transition: fill .1s; }
-  .pad-svg .arrow { fill: var(--arrow); transition: fill .1s, transform .1s; }
+  /* Design G: gradient slices with the arrow cut out; pressed slice fills and sinks */
   .pad-svg g[data-btn] { cursor: pointer; }
-  .pad-svg g.hit .seg { fill: url(#segHit); stroke: color-mix(in srgb, var(--cyan) 70%, transparent); }
-  .pad-svg g.hit .arrow { fill: #fff; }
-  .pad-svg .glow { fill: none; stroke: url(#ringGlow); stroke-width: 2; opacity: .8; transform-origin: 100px 100px; animation: spin 9s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .s-a { stop-color: var(--seg-a); } .s-b { stop-color: var(--seg-b); }
-  .h-a { stop-color: var(--cyan); } .h-b { stop-color: var(--violet); }
-  .g-a { stop-color: var(--cyan); } .g-b { stop-color: var(--pink); }
+  .pad-svg .w { transition: transform .09s; transform-origin: 100px 60px; }
+  .pad-svg .slice { opacity: .92; transition: opacity .1s; }
+  .pad-svg .solid, .pad-svg .solid-arrow { opacity: 0; transition: opacity .1s; }
+  .pad-svg g.hit .w { transform: translateY(5px) scale(.94); }
+  .pad-svg g.hit .slice { opacity: 0; }
+  .pad-svg g.hit .solid, .pad-svg g.hit .solid-arrow { opacity: 1; }
+  .g-a { stop-color: var(--cyan); } .g-b { stop-color: var(--violet); } .g-c { stop-color: var(--pink); }
+  /* Big OK: dark/light disc with a gradient ring; fills with the gradient when pressed */
   .ok {
-    position: absolute; inset: 29%; border-radius: 50%;
-    color: #fff; background: var(--grad);
-    font-weight: 800; font-size: 18px; letter-spacing: .08em;
-    box-shadow: 0 0 28px color-mix(in srgb, var(--violet) 55%, transparent), inset 0 2px 0 rgba(255,255,255,.45), inset 0 -8px 16px rgba(0,0,0,.18);
-    transition: transform .08s, box-shadow .15s;
+    position: absolute; inset: 26%; border-radius: 50%;
+    color: var(--text);
+    background: linear-gradient(var(--ok-bg), var(--ok-bg)) padding-box, var(--grad) border-box;
+    border: 2.5px solid transparent;
+    font-weight: 800; font-size: 22px; letter-spacing: .08em;
+    box-shadow: 0 8px 26px rgba(0,0,0,.25), 0 0 22px color-mix(in srgb, var(--violet) 30%, transparent);
+    transition: transform .08s, color .1s;
   }
-  .ok:active { transform: scale(.93); box-shadow: 0 0 44px color-mix(in srgb, var(--cyan) 80%, transparent), inset 0 2px 0 rgba(255,255,255,.45); }
+  .ok:active { transform: scale(.92); color: #fff; background: var(--grad) padding-box, var(--grad) border-box; }
 
   /* Swipe pad */
   .touch { display: none; width: 100%; max-width: 236px; aspect-ratio: 1; border-radius: 30px; position: relative; overflow: hidden; touch-action: none; }
@@ -286,6 +302,7 @@
         <small><span class="dot" id="dot"></span><span id="state">Connecting…</span></small>
       </div>
     </div>
+    <button class="theme-btn glass" id="themeBtn" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" id="themeIcon"></svg><span id="themeLabel">Auto</span></button>
     <button class="power glass" id="power" aria-label="Power"><svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg></button>
   </header>
 
@@ -332,29 +349,31 @@
           </div>
           <div class="pad-wrap">
             <div class="dpad">
-              <!-- Four glass segments around OK; each <g> is one button -->
+              <!-- Four equal slices (design G). Each <g data-btn> is one button; the others are rotations of UP. -->
               <svg class="pad-svg" viewBox="0 0 200 200" aria-hidden="true">
                 <defs>
-                  <radialGradient id="segFill" cx="100" cy="100" r="96" gradientUnits="userSpaceOnUse">
-                    <stop offset="0.45" class="s-b"/><stop offset="1" class="s-a"/>
-                  </radialGradient>
-                  <linearGradient id="segHit" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" class="h-a"/><stop offset="1" class="h-b"/>
+                  <linearGradient id="padGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" class="g-a"/><stop offset=".55" class="g-b"/><stop offset="1" class="g-c"/>
                   </linearGradient>
-                  <linearGradient id="ringGlow" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" class="g-a" stop-opacity="0.9"/><stop offset="0.5" class="g-a" stop-opacity="0"/><stop offset="1" class="g-b" stop-opacity="0.8"/>
-                  </linearGradient>
-                  <!-- Upward segment: ring from r=48 to r=96, 84° wide; others are rotations -->
-                  <path id="seg" d="M35.76 28.65 A96 96 0 0 1 164.24 28.65 L132.12 64.32 A48 48 0 0 0 67.88 64.32 Z"/>
-                  <!-- Bold rounded arrowhead pointing up -->
-                  <path id="arr" d="M100 18 Q102.6 18 104.4 20.4 L117 37 Q119.4 40.6 115.4 41.2 L84.6 41.2 Q80.6 40.6 83 37 L95.6 20.4 Q97.4 18 100 18 Z" transform="translate(18 14) scale(.82)"/>
+                  <!-- Upward slice: quarter ring from r=52 to r=96 (leaves room for a big OK) -->
+                  <path id="slice" d="M32.12 32.12 A96 96 0 0 1 167.88 32.12 L136.77 63.23 A52 52 0 0 0 63.23 63.23 Z"/>
+                  <path id="bigArrow" transform="translate(100 12) scale(.6) translate(-100 -20)"
+                    d="M100 20 Q103.5 20 106 23.5 L127 54 Q130 59 124 59 L110 59 L110 70 L90 70 L90 59 L76 59 Q70 59 73 54 L94 23.5 Q96.5 20 100 20 Z"/>
+                  <!-- Diagonal gaps keep the four slices visibly apart -->
+                  <mask id="gapMask" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200">
+                    <rect width="200" height="200" fill="#fff"/>
+                    <path d="M100 100 L0 0 M100 100 L200 0" stroke="#000" stroke-width="5"/>
+                  </mask>
+                  <mask id="cutMask" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200">
+                    <rect width="200" height="200" fill="#fff"/>
+                    <path d="M100 100 L0 0 M100 100 L200 0" stroke="#000" stroke-width="5"/>
+                    <use href="#bigArrow" fill="#000"/>
+                  </mask>
                 </defs>
-                <circle class="base" cx="100" cy="100" r="99"/>
-                <circle class="glow" cx="100" cy="100" r="99"/>
-                <g data-btn="UP" data-repeat><use href="#seg" class="seg"/><use href="#arr" class="arrow"/></g>
-                <g data-btn="RIGHT" data-repeat transform="rotate(90 100 100)"><use href="#seg" class="seg"/><use href="#arr" class="arrow"/></g>
-                <g data-btn="DOWN" data-repeat transform="rotate(180 100 100)"><use href="#seg" class="seg"/><use href="#arr" class="arrow"/></g>
-                <g data-btn="LEFT" data-repeat transform="rotate(270 100 100)"><use href="#seg" class="seg"/><use href="#arr" class="arrow"/></g>
+                <g data-btn="UP" data-repeat><g class="w"><use href="#slice" class="slice" fill="url(#padGrad)" mask="url(#cutMask)"/><use href="#slice" class="solid" fill="url(#padGrad)" mask="url(#gapMask)"/><use href="#bigArrow" class="solid-arrow" fill="#fff"/></g></g>
+                <g transform="rotate(90 100 100)"><g data-btn="RIGHT" data-repeat><g class="w"><use href="#slice" class="slice" fill="url(#padGrad)" mask="url(#cutMask)"/><use href="#slice" class="solid" fill="url(#padGrad)" mask="url(#gapMask)"/><use href="#bigArrow" class="solid-arrow" fill="#fff"/></g></g></g>
+                <g transform="rotate(180 100 100)"><g data-btn="DOWN" data-repeat><g class="w"><use href="#slice" class="slice" fill="url(#padGrad)" mask="url(#cutMask)"/><use href="#slice" class="solid" fill="url(#padGrad)" mask="url(#gapMask)"/><use href="#bigArrow" class="solid-arrow" fill="#fff"/></g></g></g>
+                <g transform="rotate(270 100 100)"><g data-btn="LEFT" data-repeat><g class="w"><use href="#slice" class="slice" fill="url(#padGrad)" mask="url(#cutMask)"/><use href="#slice" class="solid" fill="url(#padGrad)" mask="url(#gapMask)"/><use href="#bigArrow" class="solid-arrow" fill="#fff"/></g></g></g>
               </svg>
               <button class="ok" data-btn="ENTER">OK</button>
             </div>
@@ -397,6 +416,15 @@
 
     <!-- Setup -->
     <section class="page" data-page="settings">
+      <div class="card glass">
+        <p class="label">Appearance</p>
+        <div class="seg3" id="themeSeg">
+          <button data-theme-set="auto"><svg viewBox="0 0 24 24"></svg>Auto</button>
+          <button data-theme-set="light"><svg viewBox="0 0 24 24"></svg>Light</button>
+          <button data-theme-set="dark"><svg viewBox="0 0 24 24"></svg>Dark</button>
+        </div>
+        <p class="note">Auto follows your phone's light/dark setting.</p>
+      </div>
       <div class="card glass">
         <p class="label">TV address</p>
         <form class="row" id="ipForm">
@@ -668,6 +696,42 @@ $("scan").onclick = async () => {
   } catch (e) { toast(e.message, true); }
   $("scan").textContent = "Find TV on Wi-Fi";
 };
+
+/* Theme: Auto (follows phone) / Light / Dark */
+const THEME_ICONS = {
+  auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>',
+  light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  dark: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+};
+const THEME_NAMES = { auto: "Auto", light: "Light", dark: "Dark" };
+const systemLight = matchMedia("(prefers-color-scheme: light)");
+let themePref = "auto";
+try { themePref = localStorage.getItem("theme") || "auto"; } catch {}
+function applyTheme() {
+  const light = themePref === "light" || (themePref === "auto" && systemLight.matches);
+  document.documentElement.dataset.theme = light ? "light" : "dark";
+  $("themeIcon").innerHTML = THEME_ICONS[themePref];
+  $("themeLabel").textContent = THEME_NAMES[themePref];
+  document.querySelectorAll("[data-theme-set]").forEach((b) => b.classList.toggle("on", b.dataset.themeSet === themePref));
+  TV.setSystemBars(!light);
+}
+function setTheme(pref) {
+  themePref = pref;
+  try { localStorage.setItem("theme", pref); } catch {}
+  applyTheme();
+}
+document.querySelectorAll("[data-theme-set]").forEach((b) => {
+  b.querySelector("svg").innerHTML = THEME_ICONS[b.dataset.themeSet];
+  b.onclick = () => { buzz(6); setTheme(b.dataset.themeSet); };
+});
+$("themeBtn").onclick = () => {
+  buzz(6);
+  const next = { auto: "light", light: "dark", dark: "auto" }[themePref];
+  setTheme(next);
+  toast(next === "auto" ? "Theme: Auto (follows phone)" : `Theme: ${THEME_NAMES[next]}`);
+};
+systemLight.addEventListener("change", applyTheme);
+applyTheme();
 
 TV.onChange = () => { TV.setVolumeKeys(TV.ready); refresh(); };
 TV.onPrompt = () => { $("pairBanner").classList.add("show"); refresh(); };

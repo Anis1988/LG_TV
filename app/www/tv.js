@@ -133,6 +133,11 @@ const TV = {
     } catch {}
   },
 
+  // Status/navigation bar colors follow the app theme, not just the phone's.
+  setSystemBars(dark) {
+    Native.setSystemBars({ dark: !!dark }).catch(() => {});
+  },
+
   // Phone volume keys go to the TV only while connected.
   setVolumeKeys(enabled) {
     Native.setVolumeKeys({ enabled: !!enabled }).catch(() => {});

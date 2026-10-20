@@ -57,6 +57,16 @@ public class TvSocketPlugin extends Plugin {
         call.resolve();
     }
 
+    @PluginMethod
+    public void setSystemBars(PluginCall call) {
+        boolean dark = call.getBoolean("dark", true);
+        if (getActivity() instanceof MainActivity) {
+            MainActivity activity = (MainActivity) getActivity();
+            activity.runOnUiThread(() -> activity.setThemeDark(dark));
+        }
+        call.resolve();
+    }
+
     /** Saves TV address, pairing key and MAC so the widget can use them. */
     @PluginMethod
     public void saveConfig(PluginCall call) {

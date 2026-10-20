@@ -23,9 +23,17 @@ public class MainActivity extends BridgeActivity {
         applySystemBars();
     }
 
+    // Set by the page's theme switch; null means follow the phone.
+    private Boolean themeDark = null;
+
+    void setThemeDark(boolean dark) {
+        themeDark = dark;
+        applySystemBars();
+    }
+
     private void applySystemBars() {
-        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-            == Configuration.UI_MODE_NIGHT_YES;
+        boolean dark = themeDark != null ? themeDark
+            : (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         int bg = ContextCompat.getColor(this, dark ? R.color.app_bg_dark : R.color.app_bg_light);
         getWindow().getDecorView().setBackgroundColor(bg);
         getWindow().setStatusBarColor(bg);

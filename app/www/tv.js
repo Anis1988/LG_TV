@@ -35,6 +35,8 @@ const TV = {
   ip: store.get("tvIp") || "",
   ready: false,
   pairing: false,
+  // "unknown" | "on" | "screen_off" | "off" (standby) | "unreachable"
+  power: "unknown",
   onChange: () => {},
   onPrompt: () => {},
   onPairFail: () => {},
@@ -56,9 +58,26 @@ const TV = {
         type: "register",
         payload: { forcePairing: false, pairingType: "PROMPT", "client-key": store.get("tvKey") || undefined, manifest: MANIFEST },
       }) });
+      // A TV in standby accepts the socket but never answers registration: that means "off".
+      clearTimeout(this._regTimer);
+      this._regTimer = setTimeout(() => {
+        if (this.ready || this.pairing) return;
+        this.setPower("off");
+        this.onChange();
+        Native.close({ id: "main" }).catch(() => {});
+        this._retry = setTimeout(() => this.start(), 5000);
+      }, 3500);
     } catch {
+      this.setPower("unreachable");
+      this.onChange();
       this._retry = setTimeout(() => this.start(), 4000);
     }
+  },
+
+  setPower(p) {
+    if (p === this.power) return;
+    this.power = p;
+    Native.updateWidget({ state: p }).catch(() => {});
   },
 
   _onMessage({ id, data }) {
@@ -75,8 +94,10 @@ const TV = {
       }
       if (msg.type === "registered") {
         store.set("tvKey", msg.payload["client-key"]);
+        clearTimeout(this._regTimer);
         this.pairing = false;
         this.ready = true;
+        this.setPower("on");
         this._syncNative();
         this.onChange();
         this._rememberMac();
@@ -160,15 +181,19 @@ const TV = {
   },
 
   async status() {
-    if (!this.ready) return { connected: false };
-    const [sys, vol, app] = await Promise.allSettled([
+    if (!this.ready) return { connected: false, power: this.power };
+    const [sys, vol, app, pwr] = await Promise.allSettled([
       this.request("ssap://system/getSystemInfo"),
       this.request("ssap://audio/getVolume"),
       this.request("ssap://com.webos.applicationManager/getForegroundAppInfo"),
+      this.request("ssap://com.webos.service.tvpower/power/getPowerState"),
     ]);
     const v = vol.value || {};
+    const ps = pwr.value?.state || "";
+    this.setPower(/screen ?off|active standby/i.test(ps) ? "screen_off" : /suspend|power ?off|standby/i.test(ps) ? "off" : "on");
     return {
       connected: true,
+      power: this.power,
       model: sys.value?.modelName,
       volume: v.volumeStatus?.volume ?? v.volume,
       muted: v.volumeStatus?.muteStatus ?? v.muted,

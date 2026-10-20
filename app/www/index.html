@@ -161,7 +161,18 @@
   .eq i { width: 3px; border-radius: 2px; background: var(--grad); animation: eq 1s ease-in-out infinite; }
   .eq i:nth-child(2) { animation-delay: .2s; } .eq i:nth-child(3) { animation-delay: .4s; } .eq i:nth-child(4) { animation-delay: .1s; }
   @keyframes eq { 0%,100% { height: 4px; } 50% { height: 18px; } }
-  .offline .eq i { animation: none; height: 4px; opacity: .4; }
+  .offline .eq { display: none; }
+  /* Power state: badge + dot colors */
+  .badge { font-size: 11px; font-weight: 800; letter-spacing: .1em; padding: 6px 10px; border-radius: 10px; flex: none; }
+  .badge:empty { display: none; }
+  .now[data-state="on"] .badge { color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); }
+  .now[data-state="off"] .badge, .now[data-state="gone"] .badge { color: var(--muted); background: var(--glass-hi); }
+  .now[data-state="screen"] .badge { color: #e09a00; background: color-mix(in srgb, #ffb020 18%, transparent); }
+  .now[data-state="off"] .meta b { font-size: 18px; }
+  .now[data-state="off"] .art, .now[data-state="gone"] .art { color: var(--muted); }
+  .dot.off, .dot.unknown, .dot.setup { background: var(--muted); box-shadow: none; }
+  .dot.screen { background: #ffb020; box-shadow: 0 0 10px #ffb020; }
+  .dot.gone { background: var(--bad); box-shadow: 0 0 10px var(--bad); }
 
   /* Quick actions */
   .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
@@ -315,6 +326,7 @@
         <div class="art" id="nowArt"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/></svg></div>
         <div class="meta"><b id="nowTitle">Not connected</b><span id="nowSub">Open Setup to pick your TV</span></div>
         <div class="eq"><i></i><i></i><i></i><i></i></div>
+        <span class="badge" id="powerBadge"></span>
       </div>
 
       <div class="quick">
@@ -503,11 +515,32 @@ function appTitle(id) {
   return id ? id.replace(/^com\.webos\.app\./, "").replace(/^\w/, (c) => c.toUpperCase()) : "—";
 }
 
+const MOON = '<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const WIFI_OFF = '<svg viewBox="0 0 24 24"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5.2-2.8M14 10.2A10 10 0 0 1 19 13M12 20h.01"/></svg>';
+const TV_ICON = '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/></svg>';
+
+// One place that decides what the user sees for each power state.
+function powerInfo(s) {
+  if (!TV.ip) return { key: "setup", head: "Set up your TV", title: "Not connected", sub: "Open Setup to pick your TV", badge: "" };
+  if (TV.pairing) return { key: "unknown", head: "Waiting for approval on TV", title: "Waiting for approval", sub: "Press Accept on the TV", badge: "" };
+  if (s.connected && s.power === "screen_off") return { key: "screen", head: "Screen off · sound on", title: "Screen is off", sub: "Sound still plays · press any button to wake", badge: "SCREEN OFF" };
+  if (s.connected) return { key: "on", head: "TV is on", title: null, sub: null, badge: "ON" };
+  if (s.power === "off") return { key: "off", head: "TV is off", title: "TV is off", sub: "Tap the power button to turn it on", badge: "OFF" };
+  if (s.power === "unreachable") return { key: "gone", head: "Can't reach TV", title: "Can't reach TV", sub: "Check Wi-Fi — the TV may be unplugged", badge: "?" };
+  return { key: "unknown", head: "Checking…", title: "Checking TV…", sub: "One moment", badge: "" };
+}
+
 function renderNow(s) {
-  $("now").classList.toggle("offline", !s.connected);
-  if (!s.connected) {
-    $("nowTitle").textContent = TV.pairing ? "Waiting for approval" : TV.ip ? "TV is off" : "Not connected";
-    $("nowSub").textContent = TV.ip ? "Tap power to wake it" : "Open Setup to pick your TV";
+  const p = powerInfo(s);
+  $("now").dataset.state = p.key;
+  $("powerBadge").textContent = p.badge;
+  $("now").classList.toggle("offline", p.key !== "on");
+  if (p.key !== "on") {
+    $("nowTitle").textContent = p.title;
+    $("nowSub").textContent = p.sub;
+    const art = $("nowArt");
+    art.dataset.id = ""; art.style.background = "";
+    art.innerHTML = p.key === "off" ? MOON : p.key === "gone" ? WIFI_OFF : TV_ICON;
     return;
   }
   $("nowTitle").textContent = appTitle(s.appId);
@@ -516,9 +549,9 @@ function renderNow(s) {
   const art = $("nowArt");
   if (a && iconCache[a.icon]) {
     if (art.dataset.id !== a.id) { art.innerHTML = `<img alt="">`; art.firstChild.src = iconCache[a.icon]; art.dataset.id = a.id; art.style.background = a.bgColor || ""; }
-  } else if (art.dataset.id) {
-    art.dataset.id = ""; art.style.background = "";
-    art.innerHTML = '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/></svg>';
+  } else if (art.dataset.id !== "tv") {
+    art.dataset.id = "tv"; art.style.background = "";
+    art.innerHTML = TV_ICON;
   }
 }
 
@@ -526,10 +559,9 @@ let wasConnected = false;
 async function refresh() {
   const s = await TV.status().catch(() => ({ connected: false }));
   current = s;
-  $("dot").classList.toggle("on", s.connected);
-  $("state").textContent = s.connected ? "Connected"
-    : TV.pairing ? "Waiting for approval on TV"
-    : TV.ip ? "Offline" : "Set up your TV";
+  const p = powerInfo(s);
+  $("dot").className = "dot " + p.key;
+  $("state").textContent = p.head;
   $("power").classList.toggle("off", !s.connected);
   if (s.connected) $("pairBanner").classList.remove("show");
   if (s.model) $("model").textContent = `LG ${s.model}`;

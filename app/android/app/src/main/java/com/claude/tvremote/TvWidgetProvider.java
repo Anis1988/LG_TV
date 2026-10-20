@@ -17,7 +17,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONObject;
 
-/** Home-screen remote: power, arrows, OK, back, home, volume and mute. */
+/**
+ * Home-screen remote: power, arrows, OK, back, home, volume and mute, plus a
+ * status line that shows whether the TV is on or off.
+ */
 public class TvWidgetProvider extends AppWidgetProvider {
     static final String ACTION = "com.claude.tvremote.WIDGET_CMD";
 
@@ -26,16 +29,22 @@ public class TvWidgetProvider extends AppWidgetProvider {
 
     private static final int[] IDS = {
         R.id.w_power, R.id.w_up, R.id.w_down, R.id.w_left, R.id.w_right, R.id.w_ok,
-        R.id.w_back, R.id.w_home, R.id.w_volup, R.id.w_voldown, R.id.w_mute,
+        R.id.w_back, R.id.w_home, R.id.w_volup, R.id.w_voldown, R.id.w_mute, R.id.w_status_row,
     };
     private static final String[] CMDS = {
         "POWER", "UP", "DOWN", "LEFT", "RIGHT", "ENTER",
-        "BACK", "HOME", "VOLUP", "VOLDOWN", "MUTE",
+        "BACK", "HOME", "VOLUP", "VOLDOWN", "MUTE", "STATUS",
     };
 
     @Override
     public void onUpdate(Context ctx, AppWidgetManager mgr, int[] widgetIds) {
         for (int id : widgetIds) mgr.updateAppWidget(id, build(ctx));
+        // Placed, or the 30-minute refresh: check whether the TV is on.
+        PendingResult result = goAsync();
+        worker.execute(() -> {
+            showState(ctx, TvClient.get(ctx).powerState(), null);
+            result.finish();
+        });
     }
 
     private static RemoteViews build(Context ctx) {
@@ -50,13 +59,19 @@ public class TvWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         }
         Intent open = new Intent(ctx, MainActivity.class);
-        v.setOnClickPendingIntent(R.id.w_title, PendingIntent.getActivity(ctx, 100, open, PendingIntent.FLAG_IMMUTABLE));
+        v.setOnClickPendingIntent(R.id.w_name, PendingIntent.getActivity(ctx, 100, open, PendingIntent.FLAG_IMMUTABLE));
+        SharedPreferences prefs = prefs(ctx);
+        applyState(v, prefs.getString("widgetState", "unknown"), prefs.getString("widgetText", null));
         return v;
+    }
+
+    private static SharedPreferences prefs(Context ctx) {
+        return ctx.getSharedPreferences(TvClient.PREFS, Context.MODE_PRIVATE);
     }
 
     // Random per-install token so other apps can't fire commands at this receiver.
     private static String token(Context ctx) {
-        SharedPreferences prefs = ctx.getSharedPreferences(TvClient.PREFS, Context.MODE_PRIVATE);
+        SharedPreferences prefs = prefs(ctx);
         String t = prefs.getString("widgetToken", null);
         if (t == null) {
             t = UUID.randomUUID().toString();
@@ -74,45 +89,54 @@ public class TvWidgetProvider extends AppWidgetProvider {
         if (cmd == null) return;
 
         buzz(ctx);
+        if ("STATUS".equals(cmd)) showState(ctx, "checking", null);
         PendingResult result = goAsync();
         worker.execute(() -> {
-            String status;
-            try {
-                status = run(ctx, cmd);
-            } catch (Exception e) {
-                status = e.getMessage();
-            }
-            Log.i("TvWidget", cmd + " -> " + status);
-            setStatus(ctx, status);
+            String[] out = run(ctx, cmd);
+            Log.i("TvWidget", cmd + " -> " + out[0] + " / " + out[1]);
+            showState(ctx, out[0], out[1]);
             result.finish();
         });
     }
 
-    private static String run(Context ctx, String cmd) throws Exception {
+    /** Returns {state, message}; message null means use the plain state label. */
+    private static String[] run(Context ctx, String cmd) {
         TvClient tv = TvClient.get(ctx);
-        switch (cmd) {
-            case "POWER":
-                if (tv.connect(2500)) {
-                    tv.request("ssap://system/turnOff", null);
-                    tv.disconnect();
-                    return "Turning off";
+        try {
+            switch (cmd) {
+                case "STATUS":
+                    return new String[] { tv.powerState(), null };
+                case "POWER":
+                    if (tv.connect(2500)) {
+                        tv.request("ssap://system/turnOff", null);
+                        tv.disconnect();
+                        return new String[] { "off", null };
+                    }
+                    tv.wake();
+                    // Give the TV a few seconds to boot, then confirm.
+                    for (int i = 0; i < 4; i++) {
+                        Thread.sleep(2500);
+                        if (tv.connect(1500)) return new String[] { "on", null };
+                    }
+                    return new String[] { "off", "Waking… tap to check" };
+                case "VOLUP":
+                    tv.request("ssap://audio/volumeUp", null);
+                    return new String[] { "on", volumeText(tv) };
+                case "VOLDOWN":
+                    tv.request("ssap://audio/volumeDown", null);
+                    return new String[] { "on", volumeText(tv) };
+                case "MUTE": {
+                    boolean muted = isMuted(tv.request("ssap://audio/getVolume", null));
+                    tv.request("ssap://audio/setMute", new JSONObject().put("mute", !muted));
+                    return new String[] { "on", muted ? "TV is on · sound on" : "TV is on · muted" };
                 }
-                tv.wake();
-                return "Waking up…";
-            case "VOLUP":
-                tv.request("ssap://audio/volumeUp", null);
-                return volumeText(tv);
-            case "VOLDOWN":
-                tv.request("ssap://audio/volumeDown", null);
-                return volumeText(tv);
-            case "MUTE": {
-                boolean muted = isMuted(tv.request("ssap://audio/getVolume", null));
-                tv.request("ssap://audio/setMute", new JSONObject().put("mute", !muted));
-                return muted ? "Sound on" : "Muted";
+                default:
+                    tv.button(cmd);
+                    return new String[] { "on", null };
             }
-            default:
-                tv.button(cmd);
-                return "Connected";
+        } catch (Exception e) {
+            String state = tv.stateAfterFailure();
+            return new String[] { state, "on".equals(state) ? e.getMessage() : null };
         }
     }
 
@@ -125,17 +149,50 @@ public class TvWidgetProvider extends AppWidgetProvider {
         try {
             JSONObject v = tv.request("ssap://audio/getVolume", null);
             JSONObject s = v.optJSONObject("volumeStatus");
-            return "Volume " + (s != null ? s.optInt("volume") : v.optInt("volume"));
+            return "TV is on · volume " + (s != null ? s.optInt("volume") : v.optInt("volume"));
         } catch (Exception e) {
-            return "Connected";
+            return null;
         }
     }
 
-    private static void setStatus(Context ctx, String status) {
+    private static String label(String state) {
+        switch (state) {
+            case "on": return "TV is on";
+            case "screen_off": return "Screen off · sound on";
+            case "off": return "TV is off";
+            case "unreachable": return "Can't reach TV";
+            case "checking": return "Checking…";
+            default: return "Tap to check";
+        }
+    }
+
+    private static void applyState(RemoteViews v, String state, String text) {
+        v.setTextViewText(R.id.w_status, text != null ? text : label(state));
+        int dot;
+        switch (state) {
+            case "on": dot = R.drawable.w_dot_on; break;
+            case "screen_off": dot = R.drawable.w_dot_screen; break;
+            case "unreachable": dot = R.drawable.w_dot_unknown; break;
+            case "off": dot = R.drawable.w_dot_off; break;
+            default: dot = R.drawable.w_dot_unknown;
+        }
+        v.setImageViewResource(R.id.w_dot, dot);
+        // Power button: green "turn on" when off, red "turn off" when on.
+        boolean isOn = "on".equals(state) || "screen_off".equals(state);
+        v.setInt(R.id.w_power, "setBackgroundResource", isOn ? R.drawable.widget_btn_power : R.drawable.widget_btn_power_on);
+        v.setImageViewResource(R.id.w_power, isOn ? R.drawable.wi_power : R.drawable.wi_power_on);
+    }
+
+    /** Updates every widget's status; also used by the app when it knows the state. */
+    static void showState(Context ctx, String state, String text) {
+        if (!"checking".equals(state)) {
+            prefs(ctx).edit().putString("widgetState", state).putString("widgetText", text).apply();
+        }
         AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
         int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, TvWidgetProvider.class));
+        if (ids.length == 0) return;
         RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_remote);
-        v.setTextViewText(R.id.w_status, status == null ? "Something went wrong" : status);
+        applyState(v, state, text);
         mgr.partiallyUpdateAppWidget(ids, v);
     }
 

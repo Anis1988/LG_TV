@@ -67,6 +67,15 @@ public class TvSocketPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Lets the app keep the home-screen widget's on/off status current. */
+    @PluginMethod
+    public void updateWidget(PluginCall call) {
+        String state = call.getString("state", "unknown");
+        String text = call.getString("text");
+        pool.execute(() -> TvWidgetProvider.showState(getContext(), state, text));
+        call.resolve();
+    }
+
     /** Saves TV address, pairing key and MAC so the widget can use them. */
     @PluginMethod
     public void saveConfig(PluginCall call) {

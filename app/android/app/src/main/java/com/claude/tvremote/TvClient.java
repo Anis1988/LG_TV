@@ -37,6 +37,8 @@ final class TvClient {
     private volatile WebSocket main;
     private volatile WebSocket pointer;
     private volatile boolean ready;
+    // True if the last connect attempt reached the TV's socket (even if it never registered).
+    private volatile boolean lastOpened;
 
     static synchronized TvClient get(Context ctx) {
         if (instance == null) instance = new TvClient(ctx.getApplicationContext());
@@ -56,12 +58,14 @@ final class TvClient {
         String key = prefs.getString("key", "");
         String manifest = prefs.getString("manifest", "{}");
         CountDownLatch done = new CountDownLatch(1);
+        lastOpened = false;
 
         WebSocket ws = TvNet.client().newWebSocket(
             new Request.Builder().url("wss://" + ip + ":3001").build(),
             new WebSocketListener() {
                 @Override
                 public void onOpen(WebSocket ws, Response response) {
+                    lastOpened = true;
                     try {
                         JSONObject payload = new JSONObject()
                             .put("forcePairing", false)
@@ -202,6 +206,27 @@ final class TvClient {
             pointer = null;
             throw new Exception("Button channel failed");
         }
+    }
+
+    /**
+     * "on", "screen_off", "off" or "unreachable". A TV in standby keeps its socket
+     * open (with "Turn on via Wi-Fi") but never registers, which is how "off" is told apart.
+     */
+    String powerState() {
+        if (connect(3000)) {
+            try {
+                String s = request("ssap://com.webos.service.tvpower/power/getPowerState", null).optString("state", "");
+                if (s.matches("(?i).*(screen ?off|active standby).*")) return "screen_off";
+                if (s.matches("(?i).*(suspend|power ?off|standby).*")) return "off";
+            } catch (Exception ignored) {}
+            return "on";
+        }
+        return lastOpened ? "off" : "unreachable";
+    }
+
+    /** Like powerState() but without a fresh connect; for use right after a failed command. */
+    String stateAfterFailure() {
+        return lastOpened ? "off" : "unreachable";
     }
 
     void wake() throws Exception {

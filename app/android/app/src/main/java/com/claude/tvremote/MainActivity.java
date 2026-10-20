@@ -1,7 +1,11 @@
 package com.claude.tvremote;
 
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.KeyEvent;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -9,6 +13,26 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(TvSocketPlugin.class);
         super.onCreate(savedInstanceState);
+        applySystemBars();
+    }
+
+    // The activity handles uiMode changes itself, so re-color the system bars when light/dark flips.
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        applySystemBars();
+    }
+
+    private void applySystemBars() {
+        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+            == Configuration.UI_MODE_NIGHT_YES;
+        int bg = ContextCompat.getColor(this, dark ? R.color.app_bg_dark : R.color.app_bg_light);
+        getWindow().getDecorView().setBackgroundColor(bg);
+        getWindow().setStatusBarColor(bg);
+        getWindow().setNavigationBarColor(bg);
+        WindowInsetsControllerCompat bars = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        bars.setAppearanceLightStatusBars(!dark);
+        bars.setAppearanceLightNavigationBars(!dark);
     }
 
     // Phone volume keys control the TV while it's connected.

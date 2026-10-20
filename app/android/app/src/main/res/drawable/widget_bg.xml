@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark frosted glass panel with a light top edge -->
+<!-- Frosted glass panel with a light top edge -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="28dp" />
-            <gradient android:angle="300" android:startColor="#C21A1F35" android:endColor="#C20B0D18" />
+            <gradient android:angle="270" android:startColor="@color/w_bg_top" android:endColor="@color/w_bg_bottom" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="28dp" />
-            <gradient android:angle="270" android:startColor="#1FFFFFFF" android:endColor="#00FFFFFF" android:centerY="0.35" android:centerColor="#00FFFFFF" />
-            <stroke android:width="1dp" android:color="#33FFFFFF" />
+            <gradient android:angle="270" android:startColor="@color/w_shine" android:centerColor="#00FFFFFF" android:endColor="#00FFFFFF" android:centerY="0.3" />
+            <stroke android:width="1dp" android:color="@color/w_edge" />
         </shape>
     </item>
 </layer-list>

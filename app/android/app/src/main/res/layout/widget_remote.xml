@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Buttons use weights + scalable icons, so they grow when the widget is resized -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:padding="12dp">
 
     <!-- Header: name + status, power -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingStart="4dp">
 
         <LinearLayout
             android:id="@+id/w_title"
@@ -25,8 +27,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="LG TV"
-                android:textColor="#FFFFFFFF"
-                android:textSize="15sp"
+                android:textColor="@color/w_fg"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -35,144 +37,217 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:text="Tap to control"
-                android:textColor="#A6E6F0FF"
-                android:textSize="12sp" />
+                android:textColor="@color/w_fg_muted"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <ImageButton
             android:id="@+id/w_power"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:background="@drawable/widget_btn_power"
             android:contentDescription="Power"
-            android:src="@drawable/ic_w_power" />
+            android:src="@drawable/wi_power" />
     </LinearLayout>
 
     <!-- Body: volume | d-pad | back/home -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:layout_weight="1"
-        android:gravity="center"
         android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
             android:background="@drawable/widget_pill"
-            android:gravity="center"
             android:orientation="vertical"
-            android:padding="2dp">
+            android:padding="3dp">
 
             <ImageButton
                 android:id="@+id/w_volup"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/widget_btn"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@null"
                 android:contentDescription="Volume up"
-                android:src="@drawable/ic_w_plus" />
+                android:scaleType="fitCenter"
+                android:src="@drawable/wi_plus" />
 
             <ImageButton
                 android:id="@+id/w_mute"
-                android:layout_width="40dp"
-                android:layout_height="36dp"
-                android:background="@drawable/widget_btn"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.8"
+                android:background="@null"
                 android:contentDescription="Mute"
-                android:src="@drawable/ic_w_mute" />
+                android:padding="2dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/wi_mute" />
 
             <ImageButton
                 android:id="@+id/w_voldown"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/widget_btn"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@null"
                 android:contentDescription="Volume down"
-                android:src="@drawable/ic_w_minus" />
+                android:scaleType="fitCenter"
+                android:src="@drawable/wi_minus" />
         </LinearLayout>
 
+        <!-- 3x3 grid: arrows on the edges, OK in the middle -->
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
+            android:layout_height="match_parent"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="3"
             android:orientation="vertical">
 
-            <ImageButton
-                android:id="@+id/w_up"
-                android:layout_width="42dp"
-                android:layout_height="38dp"
-                android:background="@drawable/widget_btn"
-                android:contentDescription="Up"
-                android:src="@drawable/ic_w_up" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+
+                <ImageButton
+                    android:id="@+id/w_up"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:contentDescription="Up"
+                    android:padding="1dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/wi_up" />
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+            </LinearLayout>
 
             <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:orientation="horizontal">
 
                 <ImageButton
                     android:id="@+id/w_left"
-                    android:layout_width="38dp"
-                    android:layout_height="42dp"
-                    android:background="@drawable/widget_btn"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
                     android:contentDescription="Left"
-                    android:src="@drawable/ic_w_left" />
+                    android:padding="1dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/wi_left" />
 
-                <TextView
+                <FrameLayout
                     android:id="@+id/w_ok"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/widget_btn_ok"
-                    android:gravity="center"
-                    android:text="OK"
-                    android:textColor="#FFFFFFFF"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:contentDescription="OK">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:duplicateParentState="true"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/wi_ok" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:autoSizeMaxTextSize="30sp"
+                        android:autoSizeMinTextSize="12sp"
+                        android:autoSizeTextType="uniform"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:padding="14dp"
+                        android:text="OK"
+                        android:textColor="#FFFFFFFF"
+                        android:textStyle="bold" />
+                </FrameLayout>
 
                 <ImageButton
                     android:id="@+id/w_right"
-                    android:layout_width="38dp"
-                    android:layout_height="42dp"
-                    android:background="@drawable/widget_btn"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
                     android:contentDescription="Right"
-                    android:src="@drawable/ic_w_right" />
+                    android:padding="1dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/wi_right" />
             </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/w_down"
-                android:layout_width="42dp"
-                android:layout_height="38dp"
-                android:background="@drawable/widget_btn"
-                android:contentDescription="Down"
-                android:src="@drawable/ic_w_down" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+
+                <ImageButton
+                    android:id="@+id/w_down"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:contentDescription="Down"
+                    android:padding="1dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/wi_down" />
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
             android:background="@drawable/widget_pill"
-            android:gravity="center"
             android:orientation="vertical"
-            android:padding="2dp">
+            android:padding="3dp">
 
             <ImageButton
                 android:id="@+id/w_back"
-                android:layout_width="40dp"
-                android:layout_height="44dp"
-                android:background="@drawable/widget_btn"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@null"
                 android:contentDescription="Back"
-                android:src="@drawable/ic_w_back" />
+                android:scaleType="fitCenter"
+                android:src="@drawable/wi_back" />
 
             <ImageButton
                 android:id="@+id/w_home"
-                android:layout_width="40dp"
-                android:layout_height="44dp"
-                android:background="@drawable/widget_btn"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@null"
                 android:contentDescription="Home"
-                android:src="@drawable/ic_w_home" />
+                android:scaleType="fitCenter"
+                android:src="@drawable/wi_home" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

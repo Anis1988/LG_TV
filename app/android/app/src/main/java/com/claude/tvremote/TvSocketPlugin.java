@@ -1,6 +1,8 @@
 package com.claude.tvremote;
 
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.util.Base64;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -64,6 +66,32 @@ public class TvSocketPlugin extends Plugin {
             MainActivity activity = (MainActivity) getActivity();
             activity.runOnUiThread(() -> activity.setThemeDark(dark));
         }
+        call.resolve();
+    }
+
+    /** Installed version, e.g. "v1.6.0" for release builds (set from the git tag). */
+    @PluginMethod
+    public void appInfo(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            JSObject out = new JSObject();
+            out.put("version", ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0).versionName);
+            call.resolve(out);
+        } catch (Exception e) {
+            call.reject("No version");
+        }
+    }
+
+    /** Opens a release download in the phone's browser. Only this app's GitHub repo is allowed. */
+    @PluginMethod
+    public void openUrl(PluginCall call) {
+        String url = call.getString("url", "");
+        if (!url.startsWith("https://github.com/Anis1988/LG_TV/")) {
+            call.reject("Link not allowed");
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
         call.resolve();
     }
 

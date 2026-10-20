@@ -111,6 +111,20 @@ const TV = {
     else p.resolve(msg.payload || {});
   },
 
+  // The TV can keep the socket open after turning off, so don't wait for it to close:
+  // drop the connection ourselves and let start() re-detect the state.
+  markOff() {
+    clearTimeout(this._retry);
+    clearTimeout(this._regTimer);
+    this.ready = false;
+    this._pointerOpen = false;
+    this.setPower("off");
+    Native.close({ id: "main" }).catch(() => {});
+    Native.close({ id: "pointer" }).catch(() => {});
+    this.onChange();
+    this._retry = setTimeout(() => this.start(), 4000);
+  },
+
   _onClosed({ id }) {
     if (id === "pointer") { this._pointerOpen = false; return; }
     if (id !== "main") return;
@@ -154,6 +168,15 @@ const TV = {
     } catch {}
   },
 
+  async appVersion() {
+    const { version } = await Native.appInfo();
+    return version;
+  },
+
+  openUrl(url) {
+    return Native.openUrl({ url });
+  },
+
   // Status/navigation bar colors follow the app theme, not just the phone's.
   setSystemBars(dark) {
     Native.setSystemBars({ dark: !!dark }).catch(() => {});
@@ -190,7 +213,14 @@ const TV = {
     ]);
     const v = vol.value || {};
     const ps = pwr.value?.state || "";
-    this.setPower(/screen ?off|active standby/i.test(ps) ? "screen_off" : /suspend|power ?off|standby/i.test(ps) ? "off" : "on");
+    const noAnswer = [sys, vol, app, pwr].every((r) => r.status === "rejected");
+    const state = /screen ?off|active standby/i.test(ps) ? "screen_off" : /suspend|power ?off|standby/i.test(ps) ? "off" : "on";
+    // Turned off with the real remote: the socket may linger, so check what the TV says.
+    if (noAnswer || state === "off") {
+      this.markOff();
+      return { connected: false, power: this.power };
+    }
+    this.setPower(state);
     return {
       connected: true,
       power: this.power,
@@ -251,13 +281,13 @@ const SIMPLE = {
   stop: "ssap://media.controls/stop",
   rewind: "ssap://media.controls/rewind",
   fastForward: "ssap://media.controls/fastForward",
-  powerOff: "ssap://system/turnOff",
   screenOff: "ssap://com.webos.service.tvpower/power/turnOffScreen",
 };
 
 TV.run = function (action, body = {}) {
   if (SIMPLE[action]) return this.request(SIMPLE[action], action === "screenOff" ? { standbyMode: "active" } : {});
   switch (action) {
+    case "powerOff": return this.request("ssap://system/turnOff").then(() => this.markOff());
     case "powerOn": return this.wake();
     case "mute": return this.request("ssap://audio/setMute", { mute: !!body.mute });
     case "setVolume": return this.request("ssap://audio/setVolume", { volume: Math.max(0, Math.min(100, +body.volume)) });

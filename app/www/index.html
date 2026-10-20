@@ -301,6 +301,16 @@
   nav button.on { color: var(--text); font-weight: 700; }
   nav button.on svg { color: var(--accent-text); }
 
+  /* New-version banner */
+  .update { display: none; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; border-radius: 20px; margin-bottom: 12px; border-color: color-mix(in srgb, var(--violet) 45%, transparent); animation: rise .35s cubic-bezier(.2,.8,.2,1); }
+  .update.show { display: flex; }
+  .upd-icon { width: 38px; height: 38px; border-radius: 12px; flex: none; display: grid; place-items: center; color: #fff; background: var(--grad); }
+  .upd-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .upd-text b { font-size: 14px; }
+  .upd-text span { font-size: 12.5px; color: var(--muted); }
+  .upd-go { min-height: 40px; padding: 0 14px; border-radius: 12px; color: #fff; background: var(--grad); font-weight: 700; font-size: 13px; }
+  .upd-x { width: 36px; height: 36px; display: grid; place-items: center; color: var(--muted); border-radius: 10px; }
+  .upd-x svg { width: 18px; height: 18px; }
   .banner { display: none; border-radius: 18px; padding: 12px 14px; margin-bottom: 12px; font-size: 14px; }
   .banner.show { display: block; }
 
@@ -331,6 +341,13 @@
     <button class="theme-btn glass" id="themeBtn" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" id="themeIcon"></svg><span id="themeLabel">Auto</span></button>
     <button class="pswitch" id="power" role="switch" aria-checked="false" aria-label="TV power"><span class="lbl" id="powerLbl">OFF</span><span class="knob"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M17.7 6.3a8 8 0 1 1-11.4 0"/></svg></span></button>
   </header>
+
+  <div class="update glass" id="updBanner">
+    <div class="upd-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></div>
+    <div class="upd-text"><b>Update available</b><span id="updVer"></span></div>
+    <button class="upd-go" id="updGo">Download</button>
+    <button class="upd-x" id="updX" aria-label="Not now"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
 
   <div class="banner glass" id="pairBanner">📺 Look at your TV and press <b>Accept</b> with the remote.</div>
 
@@ -463,6 +480,13 @@
         <p class="note">Phone and TV must be on the same Wi-Fi. For power-on, enable <b>Settings → General → Devices → TV Management → Turn on via Wi-Fi</b> on the TV.</p>
       </div>
       <div class="card glass">
+        <p class="label">App version</p>
+        <div class="row" style="align-items:center">
+          <span style="flex:1;font-weight:600" id="verText">–</span>
+          <button class="ghost" id="checkUpd" style="width:auto;text-align:center">Check for updates</button>
+        </div>
+      </div>
+      <div class="card glass">
         <p class="label">Home-screen widget</p>
         <p class="note" style="margin:0">Long-press your home screen → <b>Widgets</b> → <b>TV Remote</b>. It has power, arrows, OK, back, home and volume — no need to open the app. Stretch it bigger and the buttons grow too.</p>
       </div>
@@ -573,6 +597,8 @@ function renderNow(s) {
 let wasConnected = false;
 async function refresh() {
   const s = await TV.status().catch(() => ({ connected: false }));
+  // A status that started before the TV went off can finish after; trust the live connection.
+  if (!TV.ready) { s.connected = false; s.power = TV.power; }
   current = s;
   const p = powerInfo(s);
   $("dot").className = "dot " + p.key;
@@ -671,9 +697,11 @@ function renderPower(s, p) {
 }
 $("power").onclick = () => {
   buzz(20);
-  if (current.connected) {
-    if (!confirm("Turn the TV off?")) return;
-    act("powerOff", {}, "Turning off…");
+  if (TV.ready) {
+    // Flip to OFF right away; the TV follows a moment later
+    current = { connected: false, power: "off" };
+    renderPower(current, { key: "off" });
+    act("powerOff");
   } else {
     // Show the switch moving while the TV boots (up to ~20 s)
     powerBusyUntil = Date.now() + 20000;
@@ -799,6 +827,45 @@ $("themeBtn").onclick = () => {
 };
 systemLight.addEventListener("change", applyTheme);
 applyTheme();
+
+/* Update banner: compare this install with the latest GitHub release */
+const RELEASES = "https://api.github.com/repos/Anis1988/LG_TV/releases/latest";
+const parseVer = (v) => String(v || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+function isNewer(latest, installed) {
+  const a = parseVer(latest), b = parseVer(installed);
+  for (let i = 0; i < 3; i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  return false;
+}
+let updateUrl = "";
+async function checkForUpdate(manual) {
+  try {
+    const installed = await TV.appVersion();
+    $("verText").textContent = "Version " + String(installed).replace(/^v/i, "");
+    const rel = await (await fetch(RELEASES, { cache: "no-store" })).json();
+    const apk = (rel.assets || []).find((a) => a.name.endsWith(".apk"));
+    if (!rel.tag_name || !isNewer(rel.tag_name, installed)) {
+      if (manual) toast("You're on the latest version");
+      return;
+    }
+    let dismissed = null;
+    try { dismissed = localStorage.getItem("updDismissed"); } catch {}
+    if (dismissed === rel.tag_name && !manual) return;
+    updateUrl = apk ? apk.browser_download_url : rel.html_url;
+    $("updVer").textContent = `${rel.tag_name} is ready to install`;
+    $("updBanner").classList.add("show");
+    if (manual) showTab("remote");
+  } catch {
+    if (manual) toast("Couldn't check for updates", true);
+  }
+}
+$("updGo").onclick = () => { buzz(); TV.openUrl(updateUrl).catch(() => toast("Couldn't open the download", true)); };
+$("updX").onclick = () => {
+  $("updBanner").classList.remove("show");
+  try { localStorage.setItem("updDismissed", $("updVer").textContent.split(" ")[0]); } catch {}
+};
+$("checkUpd").onclick = () => checkForUpdate(true);
+checkForUpdate(false);
+setInterval(() => checkForUpdate(false), 6 * 60 * 60 * 1000);
 
 TV.onChange = () => { TV.setVolumeKeys(TV.ready); refresh(); };
 TV.onPrompt = () => { $("pairBanner").classList.add("show"); refresh(); };

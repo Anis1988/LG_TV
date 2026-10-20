@@ -161,9 +161,27 @@ const TV = {
     return devices.map((d) => ({ id: d.id, label: d.label, connected: d.connected, appId: d.appId }));
   },
 
-  async icon(url) {
-    const { dataUrl } = await Native.fetchImage({ url });
-    return dataUrl;
+  // The TV chokes on many parallel downloads, so fetch icons a few at a time.
+  _iconQueue: [],
+  _iconActive: 0,
+  icon(url) {
+    return new Promise((resolve, reject) => {
+      this._iconQueue.push({ url, resolve, reject, tries: 0 });
+      this._pumpIcons();
+    });
+  },
+  _pumpIcons() {
+    while (this._iconActive < 4 && this._iconQueue.length) {
+      const job = this._iconQueue.shift();
+      this._iconActive++;
+      Native.fetchImage({ url: job.url })
+        .then(({ dataUrl }) => job.resolve(dataUrl))
+        .catch((e) => {
+          if (job.tries++ < 1) this._iconQueue.push(job);
+          else job.reject(e);
+        })
+        .finally(() => { this._iconActive--; this._pumpIcons(); });
+    }
   },
 
   async scan() {

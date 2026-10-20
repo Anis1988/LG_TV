@@ -167,7 +167,7 @@ public class TvSocketPlugin extends Plugin {
                 out.put("dataUrl", "data:" + type + ";base64," + b64);
                 call.resolve(out);
             } catch (Exception e) {
-                call.reject("Image failed");
+                call.reject("Image failed: " + e.getMessage());
             }
         });
     }

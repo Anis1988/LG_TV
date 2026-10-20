@@ -158,6 +158,10 @@ const TV = {
     await this.luna("luna://com.webos.service.bluetooth2/a2dp/connect", { address: a });
     await new Promise((r) => setTimeout(r, 2500));
     await this.setSoundOutput("bt_soundbar").catch(() => {});
+    // Turning the headphones on makes the TV show its own "connect?" pop-up. We've already
+    // connected, so close it with one Back press.
+    await new Promise((r) => setTimeout(r, 1200));
+    await this.button("BACK").catch(() => {});
   },
 
   phoneBluetoothDevices() {

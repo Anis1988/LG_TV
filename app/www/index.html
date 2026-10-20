@@ -180,6 +180,30 @@
   .opt-list button { display: flex; align-items: center; gap: 14px; padding: 0 16px; text-align: left; }
   .opt-list button svg { color: var(--accent-text); flex: none; }
   .opt-list button.on svg { color: #fff; }
+  /* Favorites */
+  .fav-card { display: flex; align-items: center; gap: 6px; border-radius: 20px; padding: 8px; margin-bottom: 12px; }
+  .fav-edit { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--accent-text); }
+  .fav-edit svg { width: 20px; height: 20px; }
+  .fav-row { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .fav { aspect-ratio: 16/11; border-radius: 12px; display: grid; place-items: center; background: var(--tile, #262b3d); border: 1px solid var(--edge); overflow: hidden; transition: transform .1s; box-shadow: inset 0 1px 0 rgba(255,255,255,.15); }
+  .fav:active { transform: scale(.92); }
+  .fav img { max-width: 70%; max-height: 70%; object-fit: contain; }
+  .fav .abbr { color: #fff; font-weight: 800; font-size: 14px; }
+  .fav.add { background: var(--glass); border-style: dashed; border-color: var(--edge-hi); color: var(--muted); font-size: 22px; font-weight: 400; }
+  .fav-empty { grid-column: 1 / -1; min-height: 40px; border-radius: 16px; border: 1px dashed var(--edge-hi); color: var(--muted); font-weight: 600; }
+  .sheet.tall { max-height: 85vh; overflow-y: auto; }
+  .fav-item { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 8px 6px 10px; border-radius: 16px; background: var(--glass); border: 1px solid var(--edge-hi); }
+  .fav-item .mini { width: 40px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center; overflow: hidden; background: var(--tile, #262b3d); }
+  .fav-item .mini img { max-width: 80%; max-height: 80%; }
+  .fav-item .nm { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fav-item button { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--muted); }
+  .fav-item button:active { background: var(--glass-hi); }
+  .fav-item button.rm { color: var(--bad); }
+  .fav-item button:disabled { opacity: .25; }
+  .fav-all { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .fav-all button { aspect-ratio: 16/11; border-radius: 14px; display: grid; place-items: center; overflow: hidden; background: var(--tile, #262b3d); border: 1px solid var(--edge); color: #fff; font-size: 11px; font-weight: 700; padding: 4px; }
+  .fav-all img { max-width: 70%; max-height: 70%; }
+  .fav-all.full button { opacity: .4; }
   .bt-text { display: flex; flex-direction: column; min-width: 0; }
   .bt-text small { font-size: 12.5px; font-weight: 500; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .opt-list button.bt-btn { min-height: 64px; }
@@ -274,11 +298,11 @@
   .g-a { stop-color: var(--cyan); } .g-b { stop-color: var(--violet); } .g-c { stop-color: var(--pink); }
   /* Big OK: dark/light disc with a gradient ring; fills with the gradient when pressed */
   .ok {
-    position: absolute; inset: 26%; border-radius: 50%;
+    position: absolute; inset: 31%; border-radius: 50%;
     color: var(--text);
     background: linear-gradient(var(--ok-bg), var(--ok-bg)) padding-box, var(--grad) border-box;
     border: 2.5px solid transparent;
-    font-weight: 800; font-size: 22px; letter-spacing: .08em;
+    font-weight: 800; font-size: 19px; letter-spacing: .08em;
     box-shadow: 0 8px 26px rgba(0,0,0,.25), 0 0 22px color-mix(in srgb, var(--violet) 30%, transparent);
     transition: transform .08s, color .1s;
   }
@@ -413,6 +437,12 @@
         <output id="volOut">–</output>
       </div>
 
+      <!-- Favorite apps (up to 5), editable -->
+      <div class="fav-card glass">
+        <div class="fav-row" id="favRow"></div>
+        <button class="fav-edit" data-sheet="favSheet" aria-label="Edit favorites"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+      </div>
+
       <div class="spacer"></div>
 
       <!-- Everything you press a lot sits here, in thumb reach -->
@@ -438,9 +468,9 @@
                   <linearGradient id="padGrad" x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0" class="g-a"/><stop offset=".55" class="g-b"/><stop offset="1" class="g-c"/>
                   </linearGradient>
-                  <!-- Upward slice: quarter ring from r=52 to r=96 (leaves room for a big OK) -->
-                  <path id="slice" d="M32.12 32.12 A96 96 0 0 1 167.88 32.12 L136.77 63.23 A52 52 0 0 0 63.23 63.23 Z"/>
-                  <path id="bigArrow" transform="translate(100 12) scale(.6) translate(-100 -20)"
+                  <!-- Upward slice: quarter ring from r=44 to r=96 around a medium OK (r=38) -->
+                  <path id="slice" d="M32.12 32.12 A96 96 0 0 1 167.88 32.12 L131.11 68.89 A44 44 0 0 0 68.89 68.89 Z"/>
+                  <path id="bigArrow" transform="translate(100 13) scale(.64) translate(-100 -20)"
                     d="M100 20 Q103.5 20 106 23.5 L127 54 Q130 59 124 59 L110 59 L110 70 L90 70 L90 59 L76 59 Q70 59 73 54 L94 23.5 Q96.5 20 100 20 Z"/>
                   <!-- Diagonal gaps keep the four slices visibly apart -->
                   <mask id="gapMask" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200">
@@ -562,6 +592,15 @@
     <button class="ghost" id="kbClear">Clear</button>
     <button class="primary" id="kbEnter">Search / Enter</button>
   </div>
+</div>
+
+<div class="sheet glass tall" id="favSheet" role="dialog" aria-label="Favorite apps">
+  <div class="grip"></div>
+  <h3>Favorite apps</h3>
+  <p class="note" style="margin:0 0 12px">Up to 5 apps on the Remote screen. Use the arrows to change the order.</p>
+  <div class="opt-list" id="favList"></div>
+  <p class="label" style="margin:18px 0 10px 4px">Add an app</p>
+  <div class="fav-all" id="favAll"></div>
 </div>
 
 <div class="sheet glass" id="sleepSheet" role="dialog" aria-label="Sleep timer">
@@ -707,7 +746,7 @@ async function refresh() {
 }
 
 async function loadLists() {
-  try { apps = await TV.apps(); renderApps(); } catch { toast("Could not load apps", true); }
+  try { apps = await TV.apps(); renderApps(); renderFavs(); } catch { toast("Could not load apps", true); }
   try {
     inputs = await TV.inputs();
     $("inputs").innerHTML = "";
@@ -929,6 +968,7 @@ function openSheet(id) {
   if (id === "kbSheet") { kbLast = ""; $("kbInput").value = ""; setKbMode(); setTimeout(() => $("kbInput").focus(), 250); }
   if (id === "sleepSheet") renderSleep();
   if (id === "soundSheet") loadSound();
+  if (id === "favSheet") renderFavEditor();
 }
 function closeSheet() {
   if (!openSheetId) return;
@@ -1029,6 +1069,89 @@ document.querySelectorAll("#sleepOpts button").forEach((b) => (b.onclick = async
 $("sleepCancel").onclick = async () => { buzz(); await TV.cancelSleep(); toast("Sleep timer off"); closeSheet(); syncSleep(); };
 syncSleep();
 setInterval(syncSleep, 30000);
+
+/* Favorite apps: up to 5 shortcuts on the Remote screen, stored on the phone */
+const FAV_MAX = 5;
+let favs = [];
+try { favs = JSON.parse(localStorage.getItem("favApps") || "[]"); } catch {}
+const appById = (id) => apps.find((a) => a.id === id);
+function saveFavs() {
+  try { localStorage.setItem("favApps", JSON.stringify(favs)); } catch {}
+  renderFavs();
+  renderFavEditor();
+}
+// Fill an element with an app's icon (or its first letters until the icon loads)
+function appArt(el, id) {
+  const a = appById(id);
+  el.style.setProperty("--tile", a?.bgColor || "");
+  el.innerHTML = `<span class="abbr">${(a?.title || "?").slice(0, 2)}</span>`;
+  if (!a?.icon) return;
+  const show = (src) => { el.innerHTML = ""; const img = new Image(); img.alt = a.title; img.src = src; el.appendChild(img); };
+  if (iconCache[a.icon]) show(iconCache[a.icon]);
+  else TV.icon(a.icon).then((src) => { iconCache[a.icon] = src; show(src); }).catch(() => {});
+}
+function renderFavs() {
+  const row = $("favRow");
+  row.innerHTML = "";
+  if (!favs.length) {
+    const b = document.createElement("button");
+    b.className = "fav-empty";
+    b.textContent = "+ Add your favorite apps";
+    b.onclick = () => { buzz(6); openSheet("favSheet"); };
+    row.appendChild(b);
+    return;
+  }
+  favs.forEach((id) => {
+    const b = document.createElement("button");
+    b.className = "fav";
+    b.setAttribute("aria-label", appById(id)?.title || id);
+    appArt(b, id);
+    b.onclick = () => { buzz(); act("launch", { id }, `Opening ${appById(id)?.title || "app"}`); };
+    row.appendChild(b);
+  });
+  if (favs.length < FAV_MAX) {
+    const add = document.createElement("button");
+    add.className = "fav add";
+    add.textContent = "+";
+    add.setAttribute("aria-label", "Add a favorite");
+    add.onclick = () => { buzz(6); openSheet("favSheet"); };
+    row.appendChild(add);
+  }
+}
+function renderFavEditor() {
+  const list = $("favList");
+  list.innerHTML = favs.length ? "" : '<p class="note" style="margin:0">No favorites yet — pick apps below.</p>';
+  const icon = (d) => `<svg viewBox="0 0 24 24"><path d="${d}"/></svg>`;
+  favs.forEach((id, i) => {
+    const row = document.createElement("div");
+    row.className = "fav-item";
+    const mini = document.createElement("span"); mini.className = "mini"; appArt(mini, id);
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = appById(id)?.title || id;
+    const up = document.createElement("button"); up.innerHTML = icon("m6 15 6-6 6 6"); up.disabled = i === 0; up.setAttribute("aria-label", "Move up");
+    const down = document.createElement("button"); down.innerHTML = icon("m6 9 6 6 6-6"); down.disabled = i === favs.length - 1; down.setAttribute("aria-label", "Move down");
+    const rm = document.createElement("button"); rm.className = "rm"; rm.innerHTML = icon("M6 6l12 12M18 6 6 18"); rm.setAttribute("aria-label", "Remove");
+    up.onclick = () => { buzz(6); [favs[i - 1], favs[i]] = [favs[i], favs[i - 1]]; saveFavs(); };
+    down.onclick = () => { buzz(6); [favs[i + 1], favs[i]] = [favs[i], favs[i + 1]]; saveFavs(); };
+    rm.onclick = () => { buzz(6); favs.splice(i, 1); saveFavs(); };
+    row.append(mini, nm, up, down, rm);
+    list.appendChild(row);
+  });
+  const all = $("favAll");
+  all.innerHTML = "";
+  all.classList.toggle("full", favs.length >= FAV_MAX);
+  if (!apps.length) { all.innerHTML = '<p class="note" style="grid-column:1/-1;margin:0">Turn the TV on to see its apps.</p>'; return; }
+  apps.filter((a) => !favs.includes(a.id)).forEach((a) => {
+    const b = document.createElement("button");
+    appArt(b, a.id);
+    b.setAttribute("aria-label", `Add ${a.title}`);
+    b.onclick = () => {
+      if (favs.length >= FAV_MAX) { toast("You have 5 — remove one first", true); return; }
+      buzz(6); favs.push(a.id); saveFavs();
+    };
+    all.appendChild(b);
+  });
+}
+renderFavs();
 
 /* Keyboard pops up by itself when a text box on the TV gets focus (while the app is open) */
 TV.onKeyboardFocus = (focused) => {

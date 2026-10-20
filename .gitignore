@@ -1,0 +1,7 @@
+# Pairing key and TV address stay local
+tv-key.json
+
+node_modules/
+.claude/
+*.apk
+app/www/capacitor.js

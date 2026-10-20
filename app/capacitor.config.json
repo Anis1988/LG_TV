@@ -1,0 +1,9 @@
+{
+  "appId": "com.claude.tvremote",
+  "appName": "TV Remote",
+  "webDir": "www",
+  "backgroundColor": "#0b0d12",
+  "android": {
+    "backgroundColor": "#0b0d12"
+  }
+}

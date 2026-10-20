@@ -19,4 +19,5 @@
     <color name="w_power">#FFE0334D</color>
     <color name="w_power_bg">#1FE0334D</color>
     <color name="w_ok_bg">#FFF4F6FB</color>
+    <color name="w_scrim">#B3EEF1FA</color>
 </resources>

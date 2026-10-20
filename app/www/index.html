@@ -131,9 +131,24 @@
   .brand small { color: var(--muted); display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 10px var(--bad); }
   .dot.on { background: var(--good); box-shadow: 0 0 10px var(--good); }
-  .power { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--bad) 25%, transparent); transition: transform .1s; }
-  .power.off { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--good) 25%, transparent); }
-  .power:active { transform: scale(.92); }
+  /* Big ON/OFF power switch */
+  .pswitch { position: relative; width: 88px; height: 46px; border-radius: 23px; flex: none; background: #6b7080; box-shadow: inset 0 2px 6px rgba(0,0,0,.25); transition: background .3s, box-shadow .3s; }
+  .pswitch .lbl { position: absolute; top: 0; bottom: 0; right: 13px; display: flex; align-items: center; font-weight: 800; font-size: 14px; letter-spacing: .06em; color: #fff; }
+  .pswitch .knob { position: absolute; top: 4px; left: 4px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #6b7080; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.3); transition: left .3s cubic-bezier(.3,1.3,.5,1), color .3s; }
+  .pswitch .knob svg { width: 18px; height: 18px; stroke-width: 2.6; }
+  .pswitch.on { background: #1fbf76; box-shadow: inset 0 2px 6px rgba(0,0,0,.15), 0 0 20px rgba(61,220,151,.55); }
+  .pswitch.on .lbl { right: auto; left: 15px; }
+  .pswitch.on .knob { left: 46px; color: #1fbf76; }
+  .pswitch.busy .knob { left: 25px; animation: pulse 1s ease-in-out infinite; }
+  .pswitch.busy .lbl { opacity: 0; }
+  @keyframes pulse { 50% { transform: scale(.85); } }
+
+  /* TV off: everything but the header goes grey. TV on: green glow around the screen. */
+  .pages, nav, .aurora, .grid-floor, .logo { transition: filter .5s, opacity .5s; }
+  body.tv-off .pages, body.tv-off nav, body.tv-off .logo { filter: grayscale(1); opacity: .5; }
+  body.tv-off .aurora, body.tv-off .grid-floor { filter: grayscale(1); opacity: .2; }
+  body::after { content: ""; position: fixed; inset: 0; z-index: 50; pointer-events: none; border-radius: 28px; opacity: 0; transition: opacity .5s; box-shadow: inset 0 0 0 2px rgba(61,220,151,.75), inset 0 0 28px rgba(61,220,151,.35); }
+  body.tv-on::after { opacity: 1; }
   .theme-btn { height: 48px; padding: 0 14px; border-radius: 24px; display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; transition: transform .1s; }
   .theme-btn:active { transform: scale(.94); }
   .theme-btn svg { color: var(--accent-text); }
@@ -314,7 +329,7 @@
       </div>
     </div>
     <button class="theme-btn glass" id="themeBtn" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" id="themeIcon"></svg><span id="themeLabel">Auto</span></button>
-    <button class="power glass" id="power" aria-label="Power"><svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg></button>
+    <button class="pswitch" id="power" role="switch" aria-checked="false" aria-label="TV power"><span class="lbl" id="powerLbl">OFF</span><span class="knob"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M17.7 6.3a8 8 0 1 1-11.4 0"/></svg></span></button>
   </header>
 
   <div class="banner glass" id="pairBanner">📺 Look at your TV and press <b>Accept</b> with the remote.</div>
@@ -562,7 +577,7 @@ async function refresh() {
   const p = powerInfo(s);
   $("dot").className = "dot " + p.key;
   $("state").textContent = p.head;
-  $("power").classList.toggle("off", !s.connected);
+  renderPower(s, p);
   if (s.connected) $("pairBanner").classList.remove("show");
   if (s.model) $("model").textContent = `LG ${s.model}`;
   if (!volDragging) setVolume(s.volume);
@@ -642,10 +657,30 @@ document.querySelectorAll("[data-act]").forEach((b) => {
 let playing = true;
 $("playPause").onclick = () => { buzz(); playing = !playing; act(playing ? "play" : "pause"); };
 
+/* Power switch: ON when the TV is on (or screen-off), OFF otherwise; whole app greys out when off */
+let powerBusyUntil = 0;
+function renderPower(s, p) {
+  const on = !!s.connected;
+  if (on) powerBusyUntil = 0;
+  $("power").classList.toggle("busy", Date.now() <= powerBusyUntil);
+  $("power").classList.toggle("on", on);
+  $("power").setAttribute("aria-checked", on);
+  $("powerLbl").textContent = on ? "ON" : "OFF";
+  document.body.classList.toggle("tv-on", on);
+  document.body.classList.toggle("tv-off", p.key === "off" || p.key === "gone");
+}
 $("power").onclick = () => {
   buzz(20);
-  if (current.connected) { if (confirm("Turn the TV off?")) act("powerOff", {}, "Turning off…"); }
-  else act("powerOn", {}, "Waking TV…");
+  if (current.connected) {
+    if (!confirm("Turn the TV off?")) return;
+    act("powerOff", {}, "Turning off…");
+  } else {
+    // Show the switch moving while the TV boots (up to ~20 s)
+    powerBusyUntil = Date.now() + 20000;
+    $("power").classList.add("busy");
+    act("powerOn", {}, "Turning on…");
+    TV.start();
+  }
 };
 
 /* D-pad / swipe toggle */

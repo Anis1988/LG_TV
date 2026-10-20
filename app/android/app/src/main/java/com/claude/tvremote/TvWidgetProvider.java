@@ -11,6 +11,7 @@ import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
+import android.view.View;
 import android.widget.RemoteViews;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -90,6 +91,7 @@ public class TvWidgetProvider extends AppWidgetProvider {
 
         buzz(ctx);
         if ("STATUS".equals(cmd)) showState(ctx, "checking", null);
+        if ("POWER".equals(cmd)) showState(ctx, "checking", "Working…");
         PendingResult result = goAsync();
         worker.execute(() -> {
             String[] out = run(ctx, cmd);
@@ -177,10 +179,14 @@ public class TvWidgetProvider extends AppWidgetProvider {
             default: dot = R.drawable.w_dot_unknown;
         }
         v.setImageViewResource(R.id.w_dot, dot);
-        // Power button: green "turn on" when off, red "turn off" when on.
+        if ("checking".equals(state)) return; // keep the switch where it is while checking
+        // ON/OFF switch, and dim the buttons while the TV is off.
         boolean isOn = "on".equals(state) || "screen_off".equals(state);
-        v.setInt(R.id.w_power, "setBackgroundResource", isOn ? R.drawable.widget_btn_power : R.drawable.widget_btn_power_on);
-        v.setImageViewResource(R.id.w_power, isOn ? R.drawable.wi_power : R.drawable.wi_power_on);
+        v.setInt(R.id.w_power, "setBackgroundResource", isOn ? R.drawable.w_switch_on : R.drawable.w_switch_off);
+        v.setViewVisibility(R.id.w_power_on, isOn ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.w_power_off, isOn ? View.GONE : View.VISIBLE);
+        boolean dim = "off".equals(state) || "unreachable".equals(state);
+        v.setViewVisibility(R.id.w_scrim, dim ? View.VISIBLE : View.GONE);
     }
 
     /** Updates every widget's status; also used by the app when it knows the state. */

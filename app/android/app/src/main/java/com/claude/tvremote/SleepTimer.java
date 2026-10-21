@@ -77,6 +77,47 @@ final class SleepTimer {
 
     static final String ACTION_AUTO_OFF = "com.claude.tvremote.AUTO_OFF";
 
+    // ---- Daily bedtime reminder: "TV is still on" notification if it's on at the chosen time ----
+
+    static final String ACTION_REMINDER = "com.claude.tvremote.BEDTIME_REMINDER";
+
+    static boolean reminderEnabled(Context ctx) {
+        return prefs(ctx).getBoolean("reminderOn", false);
+    }
+
+    /** Minutes after midnight; defaults to midnight. */
+    static int reminderMinutes(Context ctx) {
+        return prefs(ctx).getInt("reminderAt", 0);
+    }
+
+    static void setReminder(Context ctx, boolean enabled, int minutes) {
+        prefs(ctx).edit().putBoolean("reminderOn", enabled).putInt("reminderAt", minutes).apply();
+        scheduleReminder(ctx);
+    }
+
+    static long nextReminder(Context ctx) {
+        return reminderEnabled(ctx) ? nextAt(reminderMinutes(ctx)) : 0;
+    }
+
+    static void scheduleReminder(Context ctx) {
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        PendingIntent pi = intent(ctx, ACTION_REMINDER, 10);
+        am.cancel(pi);
+        long at = nextReminder(ctx);
+        if (at > 0) setAt(ctx, at, pi);
+    }
+
+    /** Next occurrence of a time of day (minutes after midnight). */
+    private static long nextAt(int minutes) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.set(java.util.Calendar.HOUR_OF_DAY, minutes / 60);
+        c.set(java.util.Calendar.MINUTE, minutes % 60);
+        c.set(java.util.Calendar.SECOND, 0);
+        c.set(java.util.Calendar.MILLISECOND, 0);
+        if (c.getTimeInMillis() <= System.currentTimeMillis() + 30_000) c.add(java.util.Calendar.DAY_OF_MONTH, 1);
+        return c.getTimeInMillis();
+    }
+
     static boolean autoOffEnabled(Context ctx) {
         return prefs(ctx).getBoolean("autoOffOn", false);
     }
@@ -93,15 +134,7 @@ final class SleepTimer {
 
     /** Next time the auto turn-off runs (epoch ms), or 0 when it's disabled. */
     static long nextAutoOff(Context ctx) {
-        if (!autoOffEnabled(ctx)) return 0;
-        java.util.Calendar c = java.util.Calendar.getInstance();
-        int m = autoOffMinutes(ctx);
-        c.set(java.util.Calendar.HOUR_OF_DAY, m / 60);
-        c.set(java.util.Calendar.MINUTE, m % 60);
-        c.set(java.util.Calendar.SECOND, 0);
-        c.set(java.util.Calendar.MILLISECOND, 0);
-        if (c.getTimeInMillis() <= System.currentTimeMillis() + 30_000) c.add(java.util.Calendar.DAY_OF_MONTH, 1);
-        return c.getTimeInMillis();
+        return autoOffEnabled(ctx) ? nextAt(autoOffMinutes(ctx)) : 0;
     }
 
     /** (Re)arms the next run; called on change, after each run, at boot and on app start. */

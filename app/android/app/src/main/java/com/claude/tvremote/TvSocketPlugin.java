@@ -44,6 +44,7 @@ import okhttp3.WebSocketListener;
     permissions = {
         @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT }),
         @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }),
+        @Permission(alias = "phone", strings = { Manifest.permission.READ_PHONE_STATE }),
     }
 )
 public class TvSocketPlugin extends Plugin {
@@ -58,6 +59,78 @@ public class TvSocketPlugin extends Plugin {
         instance = this;
         SleepTimer.scheduleRefresh(getContext());
         SleepTimer.scheduleAutoOff(getContext());
+        SleepTimer.scheduleReminder(getContext());
+    }
+
+    /** Bedtime reminder: {enabled, minutes after midnight}. Needs notification permission. */
+    @PluginMethod
+    public void setReminder(PluginCall call) {
+        boolean on = call.getBoolean("enabled", false);
+        if (on && Build.VERSION.SDK_INT >= 33 && getPermissionState("notifications") != PermissionState.GRANTED) {
+            requestPermissionForAlias("notifications", call, "reminderPermissionResult");
+            return;
+        }
+        SleepTimer.setReminder(getContext(), on, Math.max(0, Math.min(1439, call.getInt("minutes", 0))));
+        getReminder(call);
+    }
+
+    @PermissionCallback
+    private void reminderPermissionResult(PluginCall call) {
+        if (getPermissionState("notifications") != PermissionState.GRANTED) {
+            call.reject("Allow notifications to get the reminder");
+            return;
+        }
+        SleepTimer.setReminder(getContext(), true, Math.max(0, Math.min(1439, call.getInt("minutes", 0))));
+        getReminder(call);
+    }
+
+    @PluginMethod
+    public void getReminder(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("enabled", SleepTimer.reminderEnabled(getContext()));
+        out.put("minutes", SleepTimer.reminderMinutes(getContext()));
+        out.put("next", SleepTimer.nextReminder(getContext()));
+        call.resolve(out);
+    }
+
+    /** Pause the TV during phone calls. Needs phone-state permission. */
+    @PluginMethod
+    public void setCallPause(PluginCall call) {
+        boolean on = call.getBoolean("enabled", false);
+        if (on && getPermissionState("phone") != PermissionState.GRANTED) {
+            requestPermissionForAlias("phone", call, "phonePermissionResult");
+            return;
+        }
+        CallReceiver.setEnabled(getContext(), on);
+        getCallPause(call);
+    }
+
+    @PermissionCallback
+    private void phonePermissionResult(PluginCall call) {
+        if (getPermissionState("phone") != PermissionState.GRANTED) {
+            call.reject("Allow phone access so the app knows when a call starts");
+            return;
+        }
+        CallReceiver.setEnabled(getContext(), true);
+        getCallPause(call);
+    }
+
+    @PluginMethod
+    public void getCallPause(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("enabled", CallReceiver.enabled(getContext()));
+        call.resolve(out);
+    }
+
+    /** App-icon shortcuts from the favorites: [{id, title, icon}] */
+    @PluginMethod
+    public void setShortcuts(PluginCall call) {
+        try {
+            Shortcuts.update(getContext(), call.getArray("apps", new JSArray()));
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Shortcuts failed: " + e.getMessage());
+        }
     }
 
     /** Daily auto turn-off: {enabled, minutes} where minutes is time after midnight. */

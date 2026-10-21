@@ -180,6 +180,10 @@
   .opt-list button { display: flex; align-items: center; gap: 14px; padding: 0 16px; text-align: left; }
   .opt-list button svg { color: var(--accent-text); flex: none; }
   .opt-list button.on svg { color: #fff; }
+  .pic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pic-grid button { min-height: 48px; border-radius: 14px; background: var(--glass); border: 1px solid var(--edge-hi); font-weight: 700; font-size: 14px; }
+  .pic-grid button.on { color: #fff; background: var(--grad); border-color: transparent; }
+
   /* Setup rows with toggles */
   .set-row { display: flex; align-items: center; gap: 14px; padding: 6px 2px; }
   .set-row + .set-row { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--edge); }
@@ -537,6 +541,21 @@
         <div class="chips" id="inputs"></div>
       </div>
       <div class="card glass">
+        <p class="label">Picture mode</p>
+        <div class="pic-grid" id="picModes">
+          <button data-pic="normal">Standard</button>
+          <button data-pic="cinema">Cinema</button>
+          <button data-pic="vivid">Vivid</button>
+          <button data-pic="game">Game</button>
+          <button data-pic="eco">Eco</button>
+          <button data-pic="filmMaker">Filmmaker</button>
+        </div>
+        <div class="set-row" style="margin-top:10px">
+          <div class="set-text"><b>Eye comfort</b><span>Warmer colors, easier on the eyes at night.</span></div>
+          <button class="tgl" id="eyeTgl" role="switch" aria-checked="false" aria-label="Eye comfort"><i></i></button>
+        </div>
+      </div>
+      <div class="card glass">
         <p class="label">TV controls</p>
         <div class="chips">
           <button class="chip" data-act="screenOff"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Screen off</button>
@@ -573,6 +592,24 @@
         <div class="set-row" id="autoOffTimeRow">
           <div class="set-text"><b>Time</b><span>Every day</span></div>
           <input type="time" class="field time-field" id="autoOffTime" value="02:00">
+        </div>
+      </div>
+      <div class="card glass">
+        <p class="label">Bedtime reminder</p>
+        <div class="set-row">
+          <div class="set-text"><b>Remind me if the TV is still on</b><span id="remNote">A notification with a one-tap Turn off.</span></div>
+          <button class="tgl" id="remTgl" role="switch" aria-checked="false" aria-label="Bedtime reminder"><i></i></button>
+        </div>
+        <div class="set-row" id="remTimeRow">
+          <div class="set-text"><b>Time</b><span>Every day</span></div>
+          <input type="time" class="field time-field" id="remTime" value="00:00">
+        </div>
+      </div>
+      <div class="card glass">
+        <p class="label">Phone calls</p>
+        <div class="set-row">
+          <div class="set-text"><b>Pause the TV during calls</b><span>Pauses and mutes when a call rings; resumes when you hang up.</span></div>
+          <button class="tgl" id="callTgl" role="switch" aria-checked="false" aria-label="Pause during calls"><i></i></button>
         </div>
       </div>
       <div class="card glass">
@@ -701,6 +738,7 @@ function showTab(name) {
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("show", p.dataset.page === name));
   $("indicator").style.transform = `translateX(${TABS.indexOf(name) * 100}%)`;
+  if (name === "more" && TV.ready) loadPicture();
 }
 document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => { buzz(6); showTab(b.dataset.tab); }));
 document.querySelectorAll("[data-goto]").forEach((b) => (b.onclick = () => showTab(b.dataset.goto)));
@@ -1166,6 +1204,58 @@ $("autoOffTgl").onclick = () => { buzz(); saveAutoOff(!$("autoOffTgl").classList
 $("autoOffTime").addEventListener("change", () => saveAutoOff(true));
 TV.getAutoOff().then(renderAutoOff).catch(() => {});
 
+/* Bedtime reminder */
+function renderReminder(s) {
+  $("remTgl").classList.toggle("on", s.enabled);
+  $("remTgl").setAttribute("aria-checked", s.enabled);
+  $("remTime").value = toHHMM(s.minutes);
+  $("remTimeRow").classList.toggle("disabled", !s.enabled);
+  $("remNote").textContent = s.enabled
+    ? `Next check: ${new Date(s.next).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}. Only if the TV is on.`
+    : "A notification with a one-tap Turn off.";
+}
+async function saveReminder(enabled) {
+  try { renderReminder(await TV.setReminder(enabled, toMinutes($("remTime").value || "00:00"))); }
+  catch (e) { toast(e.message, true); }
+}
+$("remTgl").onclick = () => { buzz(); saveReminder(!$("remTgl").classList.contains("on")); };
+$("remTime").addEventListener("change", () => saveReminder(true));
+TV.getReminder().then(renderReminder).catch(() => {});
+
+/* Pause during calls */
+const renderCall = (on) => { $("callTgl").classList.toggle("on", on); $("callTgl").setAttribute("aria-checked", on); };
+$("callTgl").onclick = async () => {
+  buzz();
+  try { renderCall(await TV.setCallPause(!$("callTgl").classList.contains("on"))); }
+  catch (e) { toast(e.message, true); }
+};
+TV.getCallPause().then(renderCall).catch(() => {});
+
+/* Picture mode */
+let picState = {};
+function renderPicture() {
+  document.querySelectorAll("#picModes button").forEach((b) => b.classList.toggle("on", b.dataset.pic === picState.pictureMode));
+  $("eyeTgl").classList.toggle("on", picState.eyeComfortMode === "on");
+}
+async function loadPicture() {
+  try { picState = await TV.getPicture(); renderPicture(); } catch {}
+}
+async function changePicture(settings, label) {
+  const before = { ...picState };
+  picState = { ...picState, ...settings };
+  renderPicture();
+  try {
+    await TV.setPicture(settings);
+    setTimeout(async () => {
+      await loadPicture();
+      if (settings.pictureMode && picState.pictureMode !== settings.pictureMode) toast(`${label} isn't available for what's playing`, true);
+      else toast(label);
+    }, 1500);
+  } catch (e) { picState = before; renderPicture(); toast(e.message, true); }
+}
+document.querySelectorAll("#picModes button").forEach((b) => (b.onclick = () => { buzz(); changePicture({ pictureMode: b.dataset.pic }, `Picture: ${b.textContent}`); }));
+$("eyeTgl").onclick = () => { buzz(); const on = picState.eyeComfortMode !== "on"; changePicture({ eyeComfortMode: on ? "on" : "off" }, on ? "Eye comfort on" : "Eye comfort off"); };
+
 function renderLock(on) { $("lockTgl").classList.toggle("on", on); $("lockTgl").setAttribute("aria-checked", on); }
 $("lockTgl").onclick = async () => {
   buzz();
@@ -1189,6 +1279,15 @@ function saveFavs() {
   try { localStorage.setItem("favApps", JSON.stringify(favs)); } catch {}
   renderFavs();
   renderFavEditor();
+  syncShortcuts();
+}
+// App-icon long-press shortcuts: TV on/off, sleep, and the first two favorites.
+let shortcutTimer;
+function syncShortcuts() {
+  clearTimeout(shortcutTimer);
+  shortcutTimer = setTimeout(() => {
+    TV.setShortcuts(favs.slice(0, 2).map((id) => ({ id, title: appById(id)?.title || "App", icon: favMeta[id]?.iconData || "" })));
+  }, 1500);
 }
 function rememberFav(id, patch) {
   if (!favs.includes(id)) return;
@@ -1205,7 +1304,12 @@ function appArt(el, id) {
   if (a?.title) rememberFav(id, { title: a.title, bgColor: a.bgColor || "" });
   if (favMeta[id]?.iconData && !a?.icon) { show(favMeta[id].iconData); return; }
   if (!a?.icon) return;
-  const done = (src) => { show(src); rememberFav(id, { iconData: src }); };
+  const done = (src) => {
+    show(src);
+    const fresh = favMeta[id]?.iconData !== src;
+    rememberFav(id, { iconData: src });
+    if (fresh && favs.indexOf(id) > -1 && favs.indexOf(id) < 2) syncShortcuts();
+  };
   if (iconCache[a.icon]) done(iconCache[a.icon]);
   else TV.icon(a.icon).then((src) => { iconCache[a.icon] = src; done(src); }).catch(() => { if (favMeta[id]?.iconData) show(favMeta[id].iconData); });
 }
@@ -1271,6 +1375,7 @@ function renderFavEditor() {
   });
 }
 renderFavs();
+syncShortcuts();
 
 /* Keyboard pops up by itself when a text box on the TV gets focus (while the app is open) */
 TV.onKeyboardFocus = (focused) => {

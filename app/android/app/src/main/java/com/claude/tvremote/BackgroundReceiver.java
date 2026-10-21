@@ -14,7 +14,7 @@ public class BackgroundReceiver extends BroadcastReceiver {
     public void onReceive(Context ctx, Intent intent) {
         String action = intent.getAction();
         if (!SleepTimer.ACTION_SLEEP.equals(action) && !SleepTimer.ACTION_REFRESH.equals(action)
-            && !SleepTimer.ACTION_AUTO_OFF.equals(action)) return;
+            && !SleepTimer.ACTION_AUTO_OFF.equals(action) && !SleepTimer.ACTION_REMINDER.equals(action)) return;
         PendingResult result = goAsync();
         new Thread(() -> {
             TvClient tv = TvClient.get(ctx);
@@ -28,6 +28,11 @@ public class BackgroundReceiver extends BroadcastReceiver {
                 Log.i("TvAutoOff", "Auto turn-off ran, TV now " + state);
                 TvWidgetProvider.showState(ctx, state, null);
                 SleepTimer.scheduleAutoOff(ctx);
+            } else if (SleepTimer.ACTION_REMINDER.equals(action)) {
+                String state = tv.powerState();
+                if ("on".equals(state) || "screen_off".equals(state)) LockControls.bedtimeReminder(ctx);
+                TvWidgetProvider.showState(ctx, state, null);
+                SleepTimer.scheduleReminder(ctx);
             } else {
                 TvWidgetProvider.showState(ctx, tv.powerState(), null);
             }

@@ -30,18 +30,50 @@ final class LockControls {
         update(ctx, state);
     }
 
+    private static final int REMINDER_ID = 43;
+
+    private static boolean canNotify(Context ctx) {
+        return Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
+            == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** "TV is still on" at bedtime, with a one-tap Turn off. Removed once the TV is off. */
+    static void bedtimeReminder(Context ctx) {
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null || !canNotify(ctx)) return;
+        if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel("bedtime") == null) {
+            NotificationChannel ch = new NotificationChannel("bedtime", "Bedtime reminder", NotificationManager.IMPORTANCE_HIGH);
+            ch.setDescription("Tells you when the TV is still on at bedtime");
+            ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+            nm.createNotificationChannel(ch);
+        }
+        PendingIntent open = PendingIntent.getActivity(ctx, 400, new Intent(ctx, MainActivity.class)
+                .putExtra(MainActivity.EXTRA_OVER_LOCK, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, "bedtime")
+            .setSmallIcon(R.drawable.ic_qs_tv)
+            .setContentTitle("The TV is still on")
+            .setContentText("Turn it off for the night?")
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .addAction(0, "Turn off TV", TvWidgetProvider.commandIntent(ctx, "POWER", 401));
+        nm.notify(REMINDER_ID, b.build());
+    }
+
     /** Show the controls while the TV is on, remove them when it's off. */
     static void update(Context ctx, String state) {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
         boolean on = "on".equals(state) || "screen_off".equals(state);
         if ("checking".equals(state)) return;
+        if (!on) nm.cancel(REMINDER_ID);
         if (!enabled(ctx) || !on) {
             nm.cancel(ID);
             return;
         }
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED) return;
+        if (!canNotify(ctx)) return;
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
             nm.deleteNotificationChannel("tv_controls");
             NotificationChannel ch = new NotificationChannel(CHANNEL, "TV controls", NotificationManager.IMPORTANCE_DEFAULT);

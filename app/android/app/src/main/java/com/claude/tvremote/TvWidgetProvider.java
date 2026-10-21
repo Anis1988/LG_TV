@@ -105,7 +105,7 @@ public class TvWidgetProvider extends AppWidgetProvider {
     }
 
     // Random per-install token so other apps can't fire commands at this receiver.
-    private static String token(Context ctx) {
+    static String token(Context ctx) {
         SharedPreferences prefs = prefs(ctx);
         String t = prefs.getString("widgetToken", null);
         if (t == null) {

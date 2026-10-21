@@ -231,6 +231,22 @@ const TV = {
     return this._pointer(`type:scroll\ndx:0\ndy:${Math.round(dy)}\n\n`);
   },
 
+  // Picture mode / eye comfort. Reading is a normal request; changing goes through luna
+  // (tested on the OLED C3: pictureMode "normal"/"cinema" and eyeComfortMode "on"/"off").
+  async getPicture() {
+    const r = await this.request("ssap://settings/getSystemSettings", { category: "picture", keys: ["pictureMode", "eyeComfortMode"] });
+    return r.settings || {};
+  },
+  setPicture(settings) {
+    return this.luna("luna://com.webos.settingsservice/setSystemSettings", { category: "picture", settings });
+  },
+
+  getReminder() { return Native.getReminder(); },
+  setReminder(enabled, minutes) { return Native.setReminder({ enabled, minutes }); },
+  getCallPause() { return Native.getCallPause().then((r) => r.enabled); },
+  setCallPause(enabled) { return Native.setCallPause({ enabled }).then((r) => r.enabled); },
+  setShortcuts(apps) { return Native.setShortcuts({ apps }).catch(() => {}); },
+
   // Daily auto turn-off and lock-screen controls live in native code (work with the app closed).
   getAutoOff() { return Native.getAutoOff(); },
   setAutoOff(enabled, minutes) { return Native.setAutoOff({ enabled, minutes }); },

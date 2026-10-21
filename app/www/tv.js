@@ -203,7 +203,7 @@ const TV = {
   },
 
   // Remote buttons go through a separate pointer socket.
-  async button(name) {
+  async _pointer(data) {
     if (!this._pointerOpen) {
       // Share one open attempt between quick repeated taps.
       this._pointerOpening ??= (async () => {
@@ -213,8 +213,29 @@ const TV = {
       })().finally(() => { this._pointerOpening = null; });
       await this._pointerOpening;
     }
-    await Native.send({ id: "pointer", data: `type:button\nname:${name}\n\n` });
+    await Native.send({ id: "pointer", data });
   },
+
+  button(name) {
+    return this._pointer(`type:button\nname:${name}\n\n`);
+  },
+
+  // Touchpad mouse: move the TV's on-screen pointer, click, scroll.
+  mouseMove(dx, dy) {
+    return this._pointer(`type:move\ndx:${Math.round(dx)}\ndy:${Math.round(dy)}\ndown:0\n\n`);
+  },
+  mouseClick() {
+    return this._pointer("type:click\n\n");
+  },
+  mouseScroll(dy) {
+    return this._pointer(`type:scroll\ndx:0\ndy:${Math.round(dy)}\n\n`);
+  },
+
+  // Daily auto turn-off and lock-screen controls live in native code (work with the app closed).
+  getAutoOff() { return Native.getAutoOff(); },
+  setAutoOff(enabled, minutes) { return Native.setAutoOff({ enabled, minutes }); },
+  getLockControls() { return Native.getLockControls().then((r) => r.enabled); },
+  setLockControls(enabled) { return Native.setLockControls({ enabled }).then((r) => r.enabled); },
 
   // Save the TV's MAC while it's on, so Wake-on-LAN works when it's off.
   async _rememberMac() {

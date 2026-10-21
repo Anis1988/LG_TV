@@ -94,6 +94,16 @@ public class TvWidgetProvider extends AppWidgetProvider {
         return ctx.getSharedPreferences(TvClient.PREFS, Context.MODE_PRIVATE);
     }
 
+    /** A tap target that runs one command (used by the lock-screen controls too). */
+    static PendingIntent commandIntent(Context ctx, String cmd, int requestCode) {
+        Intent intent = new Intent(ctx, TvWidgetProvider.class)
+            .setAction(ACTION)
+            .putExtra("cmd", cmd)
+            .putExtra("token", token(ctx));
+        return PendingIntent.getBroadcast(ctx, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
     // Random per-install token so other apps can't fire commands at this receiver.
     private static String token(Context ctx) {
         SharedPreferences prefs = prefs(ctx);
@@ -239,6 +249,7 @@ public class TvWidgetProvider extends AppWidgetProvider {
             prefs(ctx).edit().putString("widgetState", state).putString("widgetText", text)
                 .putLong("widgetCheckedAt", System.currentTimeMillis()).apply();
             TvTileService.requestUpdate(ctx);
+            LockControls.update(ctx, state);
         }
         AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
         int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, TvWidgetProvider.class));

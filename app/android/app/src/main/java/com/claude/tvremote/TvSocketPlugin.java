@@ -41,7 +41,10 @@ import okhttp3.WebSocketListener;
 /** Gives the app's web page sockets to the TV, Wake-on-LAN, a Wi-Fi scan and hardware volume keys. */
 @CapacitorPlugin(
     name = "TvSocket",
-    permissions = { @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT }) }
+    permissions = {
+        @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT }),
+        @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }),
+    }
 )
 public class TvSocketPlugin extends Plugin {
     static volatile TvSocketPlugin instance;
@@ -54,6 +57,53 @@ public class TvSocketPlugin extends Plugin {
     public void load() {
         instance = this;
         SleepTimer.scheduleRefresh(getContext());
+        SleepTimer.scheduleAutoOff(getContext());
+    }
+
+    /** Daily auto turn-off: {enabled, minutes} where minutes is time after midnight. */
+    @PluginMethod
+    public void setAutoOff(PluginCall call) {
+        int minutes = Math.max(0, Math.min(1439, call.getInt("minutes", 120)));
+        SleepTimer.setAutoOff(getContext(), call.getBoolean("enabled", false), minutes);
+        getAutoOff(call);
+    }
+
+    @PluginMethod
+    public void getAutoOff(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("enabled", SleepTimer.autoOffEnabled(getContext()));
+        out.put("minutes", SleepTimer.autoOffMinutes(getContext()));
+        out.put("next", SleepTimer.nextAutoOff(getContext()));
+        call.resolve(out);
+    }
+
+    /** Lock-screen controls on/off; asks for notification permission when turning on. */
+    @PluginMethod
+    public void setLockControls(PluginCall call) {
+        boolean on = call.getBoolean("enabled", false);
+        if (on && Build.VERSION.SDK_INT >= 33 && getPermissionState("notifications") != PermissionState.GRANTED) {
+            requestPermissionForAlias("notifications", call, "notificationPermissionResult");
+            return;
+        }
+        LockControls.setEnabled(getContext(), on);
+        getLockControls(call);
+    }
+
+    @PermissionCallback
+    private void notificationPermissionResult(PluginCall call) {
+        if (getPermissionState("notifications") != PermissionState.GRANTED) {
+            call.reject("Allow notifications to show the controls");
+            return;
+        }
+        LockControls.setEnabled(getContext(), true);
+        getLockControls(call);
+    }
+
+    @PluginMethod
+    public void getLockControls(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("enabled", LockControls.enabled(getContext()));
+        call.resolve(out);
     }
 
     @PluginMethod

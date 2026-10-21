@@ -180,6 +180,19 @@
   .opt-list button { display: flex; align-items: center; gap: 14px; padding: 0 16px; text-align: left; }
   .opt-list button svg { color: var(--accent-text); flex: none; }
   .opt-list button.on svg { color: #fff; }
+  /* Setup rows with toggles */
+  .set-row { display: flex; align-items: center; gap: 14px; padding: 6px 2px; }
+  .set-row + .set-row { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--edge); }
+  .set-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .set-text b { font-size: 15px; }
+  .set-text span { font-size: 13px; color: var(--muted); }
+  .tgl { position: relative; width: 56px; height: 32px; flex: none; border-radius: 16px; background: #8a90a0; transition: background .2s; }
+  .tgl i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3); transition: left .2s; }
+  .tgl.on { background: #1fbf76; }
+  .tgl.on i { left: 27px; }
+  .time-field { flex: none; width: 130px; text-align: center; font-size: 17px; font-weight: 700; padding: 10px; }
+  .set-row.disabled { opacity: .45; pointer-events: none; }
+
   /* Favorites */
   .fav-card { display: flex; align-items: center; gap: 6px; border-radius: 20px; padding: 8px; margin-bottom: 12px; }
   .fav-edit { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--accent-text); }
@@ -313,8 +326,11 @@
   .touch p { position: absolute; inset: auto 0 12px; text-align: center; margin: 0; font-size: 12px; color: var(--muted); }
   .touch .ripple { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--cyan) 60%, transparent), transparent 70%); animation: ripple .5s ease-out forwards; pointer-events: none; }
   @keyframes ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
-  .thumb.touchmode .dpad { display: none; }
-  .thumb.touchmode .touch { display: block; }
+  .thumb.touchmode .dpad, .thumb.mousemode .dpad { display: none; }
+  .thumb.touchmode #touch { display: block; }
+  .thumb.mousemode #mousepad { display: block; }
+  .mousepad { border-radius: 22px; background-image: radial-gradient(circle, var(--edge-hi) 1px, transparent 1.5px); background-size: 18px 18px; }
+  .mousepad p { line-height: 1.5; }
 
   .bottom-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
   .pill { height: 52px; border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 600; transition: transform .08s, background .15s; }
@@ -452,6 +468,7 @@
           <div class="mode">
             <button class="on" data-mode="pad">D-pad</button>
             <button data-mode="touch">Swipe</button>
+            <button data-mode="mouse">Mouse</button>
           </div>
         </div>
         <div class="controls">
@@ -491,6 +508,7 @@
               <button class="ok" data-btn="ENTER">OK</button>
             </div>
             <div class="touch glass" id="touch"><p>Swipe to move · tap for OK</p></div>
+            <div class="touch glass mousepad" id="mousepad"><p>Drag to move pointer · tap to click<br>Two fingers to scroll</p></div>
           </div>
           <div class="rocker glass">
             <button data-act="channelUp" data-repeat aria-label="Channel up"><svg viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></svg></button>
@@ -545,6 +563,24 @@
           <button data-theme-set="dark"><svg viewBox="0 0 24 24"></svg>Dark</button>
         </div>
         <p class="note">Auto follows your phone's light/dark setting.</p>
+      </div>
+      <div class="card glass">
+        <p class="label">Auto turn-off</p>
+        <div class="set-row">
+          <div class="set-text"><b>Turn the TV off every night</b><span id="autoOffNote">If it's already off, nothing happens.</span></div>
+          <button class="tgl" id="autoOffTgl" role="switch" aria-checked="false" aria-label="Auto turn-off"><i></i></button>
+        </div>
+        <div class="set-row" id="autoOffTimeRow">
+          <div class="set-text"><b>Time</b><span>Every day</span></div>
+          <input type="time" class="field time-field" id="autoOffTime" value="02:00">
+        </div>
+      </div>
+      <div class="card glass">
+        <p class="label">Lock-screen controls</p>
+        <div class="set-row">
+          <div class="set-text"><b>Show controls while the TV is on</b><span>Volume up/down and turn off — from the lock screen or notification shade.</span></div>
+          <button class="tgl" id="lockTgl" role="switch" aria-checked="false" aria-label="Lock-screen controls"><i></i></button>
+        </div>
       </div>
       <div class="card glass">
         <p class="label">TV address</p>
@@ -844,11 +880,51 @@ $("power").onclick = () => {
 /* D-pad / swipe toggle */
 function setMode(mode) {
   $("thumb").classList.toggle("touchmode", mode === "touch");
+  $("thumb").classList.toggle("mousemode", mode === "mouse");
   document.querySelectorAll(".mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
   try { localStorage.setItem("padMode", mode); } catch {}
 }
 document.querySelectorAll(".mode button").forEach((b) => (b.onclick = () => { buzz(6); setMode(b.dataset.mode); }));
 try { setMode(localStorage.getItem("padMode") || "pad"); } catch { setMode("pad"); }
+
+/* Touchpad mouse: one finger moves the TV pointer, a quick tap clicks, two fingers scroll.
+   Movement is batched to one message per frame so the TV isn't flooded. */
+(() => {
+  const pad = $("mousepad");
+  const pts = new Map();
+  let moveX = 0, moveY = 0, scrollY = 0, frame = 0, tapStart = 0, travel = 0;
+  const flush = () => {
+    frame = 0;
+    if (moveX || moveY) { TV.mouseMove(moveX, moveY).catch(() => {}); moveX = moveY = 0; }
+    if (Math.abs(scrollY) >= 1) { TV.mouseScroll(scrollY).catch(() => {}); scrollY = 0; }
+  };
+  const queue = () => { if (!frame) frame = requestAnimationFrame(flush); };
+  pad.addEventListener("pointerdown", (e) => {
+    pad.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 1) { tapStart = Date.now(); travel = 0; }
+  });
+  pad.addEventListener("pointermove", (e) => {
+    const p = pts.get(e.pointerId);
+    if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    travel += Math.abs(dx) + Math.abs(dy);
+    if (pts.size >= 2) scrollY += dy / 2;
+    else {
+      // A little acceleration: fast flicks travel further than slow drags.
+      const speed = Math.min(3.5, 1.8 + Math.hypot(dx, dy) / 10);
+      moveX += dx * speed; moveY += dy * speed;
+    }
+    queue();
+  });
+  const end = (e) => {
+    const wasSingle = pts.size === 1;
+    pts.delete(e.pointerId);
+    if (wasSingle && travel < 10 && Date.now() - tapStart < 300) { buzz(); TV.mouseClick().catch(() => {}); }
+  };
+  ["pointerup", "pointercancel"].forEach((ev) => pad.addEventListener(ev, end));
+})();
 
 /* Swipe pad: each 40px of travel is one arrow press, a tap is OK */
 (() => {
@@ -1069,6 +1145,37 @@ document.querySelectorAll("#sleepOpts button").forEach((b) => (b.onclick = async
 $("sleepCancel").onclick = async () => { buzz(); await TV.cancelSleep(); toast("Sleep timer off"); closeSheet(); syncSleep(); };
 syncSleep();
 setInterval(syncSleep, 30000);
+
+/* Setup: daily auto turn-off + lock-screen controls (stored natively) */
+const toMinutes = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+const toHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+function renderAutoOff(s) {
+  $("autoOffTgl").classList.toggle("on", s.enabled);
+  $("autoOffTgl").setAttribute("aria-checked", s.enabled);
+  $("autoOffTime").value = toHHMM(s.minutes);
+  $("autoOffTimeRow").classList.toggle("disabled", !s.enabled);
+  $("autoOffNote").textContent = s.enabled
+    ? `Next: ${new Date(s.next).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}. If it's already off, nothing happens.`
+    : "If it's already off, nothing happens.";
+}
+async function saveAutoOff(enabled) {
+  try { renderAutoOff(await TV.setAutoOff(enabled, toMinutes($("autoOffTime").value || "02:00"))); }
+  catch (e) { toast(e.message, true); }
+}
+$("autoOffTgl").onclick = () => { buzz(); saveAutoOff(!$("autoOffTgl").classList.contains("on")); };
+$("autoOffTime").addEventListener("change", () => saveAutoOff(true));
+TV.getAutoOff().then(renderAutoOff).catch(() => {});
+
+function renderLock(on) { $("lockTgl").classList.toggle("on", on); $("lockTgl").setAttribute("aria-checked", on); }
+$("lockTgl").onclick = async () => {
+  buzz();
+  try {
+    const on = await TV.setLockControls(!$("lockTgl").classList.contains("on"));
+    renderLock(on);
+    if (on) { TV.pushWidget(); toast("Controls show while the TV is on"); }
+  } catch (e) { toast(e.message, true); }
+};
+TV.getLockControls().then(renderLock).catch(() => {});
 
 /* Favorite apps: up to 5 shortcuts on the Remote screen, stored on the phone */
 const FAV_MAX = 5;

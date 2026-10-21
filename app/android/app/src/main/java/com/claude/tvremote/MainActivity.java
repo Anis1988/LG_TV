@@ -1,5 +1,6 @@
 package com.claude.tvremote;
 
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -10,11 +11,15 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    /** Set when opened from the lock-screen notification: show on top of the lock screen. */
+    static final String EXTRA_OVER_LOCK = "overLock";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(TvSocketPlugin.class);
         super.onCreate(savedInstanceState);
         applySystemBars();
+        applyOverLock(getIntent());
 
         // Back: let the page close a panel or return to the Remote tab first; only leave when it says so.
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -28,6 +33,23 @@ public class MainActivity extends BridgeActivity {
                 });
             }
         });
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        applyOverLock(intent);
+    }
+
+    // Only the remote is reachable without unlocking, and only while it's open from the notification.
+    private void applyOverLock(Intent intent) {
+        if (intent != null && intent.getBooleanExtra(EXTRA_OVER_LOCK, false)) setShowWhenLocked(true);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        setShowWhenLocked(false);
     }
 
     // The activity handles uiMode changes itself, so re-color the system bars when light/dark flips.

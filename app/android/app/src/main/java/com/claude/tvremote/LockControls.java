@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.widget.RemoteViews;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
@@ -51,12 +52,29 @@ final class LockControls {
             ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
             nm.createNotificationChannel(ch);
         }
-        PendingIntent open = PendingIntent.getActivity(ctx, 300, new Intent(ctx, MainActivity.class),
+        // Tapping the notification opens the full remote on top of the lock screen.
+        Intent openIntent = new Intent(ctx, MainActivity.class)
+            .putExtra(MainActivity.EXTRA_OVER_LOCK, true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent open = PendingIntent.getActivity(ctx, 300, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        // Mini remote: a row of buttons when collapsed, arrows + OK when expanded.
+        RemoteViews small = new RemoteViews(ctx.getPackageName(), R.layout.notif_small);
+        bind(ctx, small, new int[] { R.id.n_voldown_s, R.id.n_volup_s, R.id.n_back_s, R.id.n_ok_s, R.id.n_home_s },
+            new String[] { "VOLDOWN", "VOLUP", "BACK", "ENTER", "HOME" }, 310);
+        RemoteViews big = new RemoteViews(ctx.getPackageName(), R.layout.notif_big);
+        bind(ctx, big, new int[] { R.id.n_up, R.id.n_down, R.id.n_left, R.id.n_right, R.id.n_ok,
+                R.id.n_back, R.id.n_home, R.id.n_volup, R.id.n_voldown, R.id.n_mute },
+            new String[] { "UP", "DOWN", "LEFT", "RIGHT", "ENTER", "BACK", "HOME", "VOLUP", "VOLDOWN", "MUTE" }, 320);
+
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_qs_tv)
             .setContentTitle("LG TV is on")
-            .setContentText("screen_off".equals(state) ? "Screen off · sound on" : "Tap to open the remote")
+            .setContentText("screen_off".equals(state) ? "Screen off · sound on" : "Tap to open the full remote")
+            .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(small)
+            .setCustomBigContentView(big)
             .setContentIntent(open)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -64,10 +82,13 @@ final class LockControls {
             .setShowWhen(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .addAction(0, "Vol −", TvWidgetProvider.commandIntent(ctx, "VOLDOWN", 301))
-            .addAction(0, "Vol +", TvWidgetProvider.commandIntent(ctx, "VOLUP", 302))
-            // Android shows at most 3 buttons on a notification.
             .addAction(0, "Turn off TV", TvWidgetProvider.commandIntent(ctx, "POWER", 304));
         nm.notify(ID, b.build());
+    }
+
+    private static void bind(Context ctx, RemoteViews v, int[] ids, String[] cmds, int firstCode) {
+        for (int i = 0; i < ids.length; i++) {
+            v.setOnClickPendingIntent(ids[i], TvWidgetProvider.commandIntent(ctx, cmds[i], firstCode + i));
+        }
     }
 }

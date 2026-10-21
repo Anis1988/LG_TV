@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lock-screen mini remote (expanded): back/home | arrows + OK | volume -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="156dp"
+    android:gravity="center" android:orientation="horizontal">
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+        <ImageButton android:id="@+id/n_back" android:layout_width="48dp" android:layout_height="48dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Back" android:src="@drawable/wi_back" />
+        <ImageButton android:id="@+id/n_home" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginTop="8dp"
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Home" android:src="@drawable/wi_home" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical">
+        <ImageButton android:id="@+id/n_up" android:layout_width="48dp" android:layout_height="48dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Up" android:src="@drawable/wi_up" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:orientation="horizontal">
+        <ImageButton android:id="@+id/n_left" android:layout_width="48dp" android:layout_height="48dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Left" android:src="@drawable/wi_left" />
+            <FrameLayout android:id="@+id/n_ok" android:layout_width="52dp" android:layout_height="52dp" android:contentDescription="OK">
+                <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:duplicateParentState="true" android:scaleType="fitCenter" android:src="@drawable/wi_ok" />
+                <TextView android:layout_width="match_parent" android:layout_height="match_parent" android:duplicateParentState="true" android:gravity="center" android:text="OK" android:textColor="@color/w_ok_text" android:textSize="15sp" android:textStyle="bold" />
+            </FrameLayout>
+        <ImageButton android:id="@+id/n_right" android:layout_width="48dp" android:layout_height="48dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Right" android:src="@drawable/wi_right" />
+        </LinearLayout>
+        <ImageButton android:id="@+id/n_down" android:layout_width="48dp" android:layout_height="48dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Down" android:src="@drawable/wi_down" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+        <ImageButton android:id="@+id/n_volup" android:layout_width="48dp" android:layout_height="44dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Volume up" android:src="@drawable/wi_plus" />
+        <ImageButton android:id="@+id/n_mute" android:layout_width="44dp" android:layout_height="40dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Mute" android:src="@drawable/wi_mute" />
+        <ImageButton android:id="@+id/n_voldown" android:layout_width="48dp" android:layout_height="44dp" 
+            android:background="@null" android:padding="3dp" android:scaleType="fitCenter"
+            android:contentDescription="Volume down" android:src="@drawable/wi_minus" />
+    </LinearLayout>
+</LinearLayout>

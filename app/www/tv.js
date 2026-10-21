@@ -57,7 +57,7 @@ const TV = {
           "client-key": store.get("pairVersion") === PAIR_VERSION ? store.get("tvKey") || undefined : undefined,
           manifest: MANIFEST,
         },
-      }) });
+      }) }).catch(() => {});
       // A TV in standby accepts the socket but never answers registration: that means "off".
       clearTimeout(this._regTimer);
       this._regTimer = setTimeout(() => {

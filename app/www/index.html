@@ -576,9 +576,9 @@
         </div>
       </div>
       <div class="card glass">
-        <p class="label">Lock-screen controls</p>
+        <p class="label">Lock-screen remote</p>
         <div class="set-row">
-          <div class="set-text"><b>Show controls while the TV is on</b><span>Volume up/down and turn off — from the lock screen or notification shade.</span></div>
+          <div class="set-text"><b>Remote on the lock screen</b><span>While the TV is on: arrows, OK, Back, Home and volume without unlocking. Tap it for the full remote.</span></div>
           <button class="tgl" id="lockTgl" role="switch" aria-checked="false" aria-label="Lock-screen controls"><i></i></button>
         </div>
       </div>
@@ -1181,21 +1181,33 @@ TV.getLockControls().then(renderLock).catch(() => {});
 const FAV_MAX = 5;
 let favs = [];
 try { favs = JSON.parse(localStorage.getItem("favApps") || "[]"); } catch {}
-const appById = (id) => apps.find((a) => a.id === id);
+// Favorites' name, color and icon are remembered on the phone so they show while the TV is off.
+let favMeta = {};
+try { favMeta = JSON.parse(localStorage.getItem("favMeta") || "{}"); } catch {}
+const appById = (id) => apps.find((a) => a.id === id) || (favMeta[id] && { id, ...favMeta[id] });
 function saveFavs() {
   try { localStorage.setItem("favApps", JSON.stringify(favs)); } catch {}
   renderFavs();
   renderFavEditor();
+}
+function rememberFav(id, patch) {
+  if (!favs.includes(id)) return;
+  favMeta[id] = { ...favMeta[id], ...patch };
+  Object.keys(favMeta).forEach((k) => { if (!favs.includes(k)) delete favMeta[k]; });
+  try { localStorage.setItem("favMeta", JSON.stringify(favMeta)); } catch {}
 }
 // Fill an element with an app's icon (or its first letters until the icon loads)
 function appArt(el, id) {
   const a = appById(id);
   el.style.setProperty("--tile", a?.bgColor || "");
   el.innerHTML = `<span class="abbr">${(a?.title || "?").slice(0, 2)}</span>`;
-  if (!a?.icon) return;
   const show = (src) => { el.innerHTML = ""; const img = new Image(); img.alt = a.title; img.src = src; el.appendChild(img); };
-  if (iconCache[a.icon]) show(iconCache[a.icon]);
-  else TV.icon(a.icon).then((src) => { iconCache[a.icon] = src; show(src); }).catch(() => {});
+  if (a?.title) rememberFav(id, { title: a.title, bgColor: a.bgColor || "" });
+  if (favMeta[id]?.iconData && !a?.icon) { show(favMeta[id].iconData); return; }
+  if (!a?.icon) return;
+  const done = (src) => { show(src); rememberFav(id, { iconData: src }); };
+  if (iconCache[a.icon]) done(iconCache[a.icon]);
+  else TV.icon(a.icon).then((src) => { iconCache[a.icon] = src; done(src); }).catch(() => { if (favMeta[id]?.iconData) show(favMeta[id].iconData); });
 }
 function renderFavs() {
   const row = $("favRow");

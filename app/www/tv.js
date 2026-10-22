@@ -386,6 +386,11 @@ const TV = {
 
   // Uninstall through the TV's own installer (luna). No public remote command for this, so it may
   // be refused on some firmware; the caller re-lists apps to see what was really removed.
+  // App's page in the LG Content Store, which has the TV's own Delete button.
+  openAppPage(id) {
+    return this.request("ssap://system.launcher/launch", { id: "com.webos.app.discovery", params: { query: `category/GAME_APPS/${id}` } });
+  },
+
   uninstall(id) {
     return this.luna("luna://com.webos.appInstallService/remove", { id, subscribe: false });
   },

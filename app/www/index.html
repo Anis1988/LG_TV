@@ -1581,6 +1581,8 @@ const MANUAL = [
 ];
 let cleanApps = [];
 const cleanPick = new Set();
+// Apps the TV refused to remove from the phone: the user deletes them on the TV, one tap each.
+let blocked = [];
 let homeVals = [];
 const homeWant = new Map();
 
@@ -1630,6 +1632,22 @@ function renderHome() {
 function renderClean() {
   const box = $("cleanLists");
   box.innerHTML = "";
+  blocked = blocked.filter((a) => cleanApps.some((x) => x.id === a.id));
+  if (blocked.length) {
+    const card = groupCard(`Delete on the TV · ${blocked.length}`, blocked.map((a) => {
+      const el = checkItem(a.title, "Tap: opens it on the TV → choose Delete", false, () => {
+        TV.openAppPage(a.id).then(() => toast(`On TV: pick Delete for ${a.title}`)).catch((e) => toast(e.message, true));
+        return false;
+      });
+      el.classList.add("info");
+      return el;
+    }));
+    const tip = document.createElement("p");
+    tip.className = "note";
+    tip.innerHTML = "LG blocks remote apps from deleting apps. If the page has no Delete: on the TV home, highlight the app, <b>hold OK</b>, then pick <b>Delete</b>. Tap <b>Scan again</b> after.";
+    card.appendChild(tip);
+    box.appendChild(card);
+  }
   [["junk", "Apps safe to remove"], ["maybe", "Apps — your call"], ["keep", "Apps to keep (system)"]].forEach(([g, label]) => {
     const list = cleanApps.filter((a) => cleanSort(a).group === g);
     if (!list.length) return;
@@ -1708,11 +1726,14 @@ async function cleanRemove() {
     setLeft = settings.filter((h) => { const x = home.find((y) => y.key === h.key); return x && isOn(x.value) !== (h.best === "on"); });
   } catch {}
   homeWant.clear();
+  blocked = appsLeft;
+  appsLeft.forEach((a) => cleanPick.delete(a.id));
   const failed = [...setLeft.map((h) => h.label), ...appsLeft.map((a) => a.title)];
   const done = picked.length + settings.length - failed.length;
   if (!failed.length) toast(`Done: ${done} change${done === 1 ? "" : "s"}`);
-  else toast(`Done ${done}. TV refused: ${failed.join(", ")}`, true);
+  else toast(`Done ${done}. ${failed.length} need a tap on the TV — see top of list`, true);
   await cleanScan();
+  if (blocked.length) $("cleanLists").scrollIntoView({ behavior: "smooth" });
   loadLists();
 }
 

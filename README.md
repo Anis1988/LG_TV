@@ -24,7 +24,7 @@ ON/OFF power switch with on/off detection, light/dark themes, keyboard (type int
 sound output switching, a TV Home tab (turns off LG home ads, suggestions and channels, removes junk apps — only after you confirm), a Quick Settings tile, an update banner, and a home-screen widget (power, arrows, OK,
 back, home, volume, mute, sleep) that works without opening the app.
 
-Releases: pushing a `v*` tag builds the APK on GitHub Actions and attaches it to a GitHub Release.
+Releases: every push to `main` that changes the app builds the APK on GitHub Actions and publishes the next version (v1.13.0 → v1.14.0) as a GitHub Release. A `v*` tag still sets a version by hand.
 For power-on, enable *Settings → General → Devices → TV Management → Turn on via Wi-Fi* on the TV.
 
 ## PC dashboard

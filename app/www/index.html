@@ -353,6 +353,18 @@
   .tile .name { display: none; font-size: 12px; font-weight: 600; padding: 6px; text-align: center; }
   .tile.noimg .name { display: block; }
 
+  /* Clean up */
+  .clean-item { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 10px; border-radius: 16px; background: var(--glass); border: 1px solid var(--edge); text-align: left; width: 100%; }
+  .clean-item .set-text b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .clean-item .box { width: 26px; height: 26px; flex: none; border-radius: 8px; border: 2px solid var(--edge-hi); display: grid; place-items: center; color: #fff; }
+  .clean-item.on { border-color: color-mix(in srgb, var(--cyan) 65%, transparent); }
+  .clean-item.on .box { background: var(--grad); border-color: transparent; }
+  .clean-item.on .box::after { content: "✓"; font-weight: 800; font-size: 15px; }
+  .clean-item.keep { opacity: .6; }
+  .clean-item.keep .box { visibility: hidden; }
+  .clean-go { width: 100%; margin-top: 4px; }
+  .clean-go:disabled { opacity: .45; box-shadow: none; }
+
   /* Inputs + message + setup */
   .card { border-radius: 24px; padding: 16px; margin-bottom: 12px; }
   .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -375,11 +387,11 @@
     position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
     bottom: calc(env(safe-area-inset-bottom) + 12px);
     width: calc(100% - 24px); max-width: 496px; height: var(--nav-h);
-    display: grid; grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr);
     border-radius: 26px; padding: 7px;
   }
   nav.glass { background: var(--nav-bg); }
-  nav .indicator { position: absolute; top: 7px; bottom: 7px; left: 7px; width: calc((100% - 14px) / 4); border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--cyan) 20%, transparent), color-mix(in srgb, var(--violet) 22%, transparent)); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); transition: transform .35s cubic-bezier(.3,1.3,.5,1); }
+  nav .indicator { position: absolute; top: 7px; bottom: 7px; left: 7px; width: calc((100% - 14px) / 5); border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--cyan) 20%, transparent), color-mix(in srgb, var(--violet) 22%, transparent)); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); transition: transform .35s cubic-bezier(.3,1.3,.5,1); }
   nav button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 500; color: var(--muted); transition: color .2s; }
   nav button.on { color: var(--text); font-weight: 700; }
   nav button.on svg { color: var(--accent-text); }
@@ -572,6 +584,17 @@
       </div>
     </section>
 
+    <!-- Clean up: list apps, sort into remove / your call / keep. Nothing is removed until confirmed. -->
+    <section class="page" data-page="clean">
+      <div class="card glass">
+        <p class="label">Clean up TV</p>
+        <p class="note" style="margin:0">Lists every app on the TV and sorts it. Nothing is removed until you tick apps and say <b>Yes</b>.</p>
+        <button class="primary clean-go" id="cleanScan" style="margin-top:12px">Scan TV apps</button>
+      </div>
+      <div id="cleanLists"></div>
+      <button class="primary clean-go" id="cleanGo" disabled>Remove selected</button>
+    </section>
+
     <!-- Setup -->
     <section class="page" data-page="settings">
       <div class="card glass">
@@ -650,6 +673,7 @@
   <button class="on" data-tab="remote"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>Remote</button>
   <button data-tab="apps"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>Apps</button>
   <button data-tab="more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>More</button>
+  <button data-tab="clean"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/></svg>Clean</button>
   <button data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Setup</button>
 </nav>
 
@@ -704,6 +728,16 @@
   </div>
   <button class="ghost link-btn" id="btChange">Change headphones</button>
 </div>
+<div class="sheet glass tall" id="cleanSheet" role="dialog" aria-label="Confirm removal">
+  <div class="grip"></div>
+  <h3>Remove these apps?</h3>
+  <p class="note" style="margin:0 0 12px">They go away from the TV. You can get them back later from the LG Content Store.</p>
+  <div class="opt-list" id="cleanConfirmList"></div>
+  <div class="sheet-row" style="margin-top:14px">
+    <button class="ghost" id="cleanNo">No</button>
+    <button class="primary" id="cleanYes">Yes, remove</button>
+  </div>
+</div>
 <div class="toast glass" id="toast"></div>
 
 <script src="capacitor.js"></script>
@@ -733,7 +767,7 @@ async function act(action, body, done) {
 const press = (name) => act("button", { name });
 
 /* Tabs with sliding indicator */
-const TABS = ["remote", "apps", "more", "settings"];
+const TABS = ["remote", "apps", "more", "clean", "settings"];
 function showTab(name) {
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("show", p.dataset.page === name));
@@ -1083,6 +1117,7 @@ function openSheet(id) {
   if (id === "sleepSheet") renderSleep();
   if (id === "soundSheet") loadSound();
   if (id === "favSheet") renderFavEditor();
+  if (id === "cleanSheet") renderCleanConfirm();
 }
 function closeSheet() {
   if (!openSheetId) return;
@@ -1505,6 +1540,113 @@ document.addEventListener("visibilitychange", () => {
 });
 // While the app is open it has the freshest view; keep the widget and tile in step.
 setInterval(() => { if (!document.hidden) TV.pushWidget(); }, 5 * 60 * 1000);
+
+/* Clean up: sort the TV's apps. Nothing is removed until the user ticks apps and taps Yes. */
+// Preloaded promo / ad-supported apps that are safe to drop (matched by name).
+const JUNK = [
+  [/lg channels/i, "LG's free ad channels"],
+  [/rakuten/i, "Preloaded paid video store"],
+  [/sports portal/i, "LG sports promo hub"],
+  [/fitness/i, "Preloaded workout app"],
+  [/shop|shopping/i, "Shopping promo"],
+  [/home office/i, "Rarely used office hub"],
+  [/pluto|tubi|xumo|vudu|fandango|sling|philo|kidoodle|facebook watch/i, "Preloaded partner app"],
+];
+let cleanApps = [];
+const cleanPick = new Set();
+
+function cleanSort(a) {
+  if (!a.removable || a.system) return { group: "keep", why: "Part of the TV — can't remove" };
+  if (favs.includes(a.id)) return { group: "maybe", why: "In your favorites" };
+  const j = JUNK.find(([re]) => re.test(a.title));
+  if (j) return { group: "junk", why: j[1] };
+  return { group: "maybe", why: "Remove only if you never use it" };
+}
+
+function renderClean() {
+  const box = $("cleanLists");
+  box.innerHTML = "";
+  const groups = [["junk", "Safe to remove"], ["maybe", "Your call"], ["keep", "Keep (system)"]];
+  groups.forEach(([g, label]) => {
+    const list = cleanApps.filter((a) => cleanSort(a).group === g);
+    if (!list.length) return;
+    const card = document.createElement("div");
+    card.className = "card glass";
+    card.innerHTML = `<p class="label">${label} · ${list.length}</p><div class="opt-list"></div>`;
+    list.forEach((a) => {
+      const b = document.createElement("button");
+      b.className = "clean-item" + (g === "keep" ? " keep" : "") + (cleanPick.has(a.id) ? " on" : "");
+      b.innerHTML = '<span class="box"></span><div class="set-text"><b></b><span></span></div>';
+      b.querySelector("b").textContent = a.title;
+      b.querySelector(".set-text span").textContent = cleanSort(a).why;
+      if (g !== "keep") b.onclick = () => {
+        buzz(6);
+        cleanPick.has(a.id) ? cleanPick.delete(a.id) : cleanPick.add(a.id);
+        b.classList.toggle("on", cleanPick.has(a.id));
+        cleanCount();
+      };
+      card.lastChild.appendChild(b);
+    });
+    box.appendChild(card);
+  });
+  cleanCount();
+}
+
+function cleanCount() {
+  $("cleanGo").disabled = !cleanPick.size;
+  $("cleanGo").textContent = cleanPick.size ? `Remove selected (${cleanPick.size})` : "Remove selected";
+}
+
+async function cleanScan() {
+  if (!TV.ready) return toast("Connect to the TV first", true);
+  $("cleanScan").textContent = "Scanning…";
+  try {
+    cleanApps = (await TV.apps()).sort((a, b) => a.title.localeCompare(b.title));
+    cleanPick.forEach((id) => { if (!cleanApps.some((a) => a.id === id)) cleanPick.delete(id); });
+    renderClean();
+    toast(`Found ${cleanApps.length} apps`);
+  } catch { toast("Could not read apps", true); }
+  $("cleanScan").textContent = "Scan again";
+}
+
+function renderCleanConfirm() {
+  const list = $("cleanConfirmList");
+  list.innerHTML = "";
+  cleanApps.filter((a) => cleanPick.has(a.id)).forEach((a) => {
+    const d = document.createElement("div");
+    d.className = "clean-item";
+    d.textContent = a.title;
+    list.appendChild(d);
+  });
+}
+
+async function cleanRemove() {
+  closeSheet();
+  const picked = cleanApps.filter((a) => cleanPick.has(a.id));
+  $("cleanGo").disabled = true;
+  $("cleanGo").textContent = "Removing…";
+  for (const a of picked) {
+    try { await TV.uninstall(a.id); } catch {}
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  // Check what's really gone: the TV gives no reliable answer to the remove call itself.
+  await new Promise((r) => setTimeout(r, 2000));
+  let left = [];
+  try {
+    const now = await TV.apps();
+    left = picked.filter((a) => now.some((x) => x.id === a.id));
+  } catch {}
+  const gone = picked.length - left.length;
+  if (!left.length) toast(`Removed ${gone} app${gone === 1 ? "" : "s"}`);
+  else toast(`Removed ${gone}. TV refused: ${left.map((a) => a.title).join(", ")}`, true);
+  await cleanScan();
+  loadLists();
+}
+
+$("cleanScan").onclick = cleanScan;
+$("cleanGo").onclick = () => { if (cleanPick.size) openSheet("cleanSheet"); };
+$("cleanNo").onclick = closeSheet;
+$("cleanYes").onclick = cleanRemove;
 </script>
 </body>
 </html>

@@ -377,7 +377,14 @@ const TV = {
 
   async apps() {
     const { launchPoints = [] } = await this.request("ssap://com.webos.applicationManager/listLaunchPoints");
-    return launchPoints.map((a) => ({ id: a.id, title: a.title, icon: a.largeIcon || a.icon, bgColor: a.bgColor }));
+    return launchPoints.map((a) => ({ id: a.id, title: a.title, icon: a.largeIcon || a.icon, bgColor: a.bgColor,
+      removable: a.removable === true, system: !!a.systemApp }));
+  },
+
+  // Uninstall through the TV's own installer (luna). No public remote command for this, so it may
+  // be refused on some firmware; the caller re-lists apps to see what was really removed.
+  uninstall(id) {
+    return this.luna("luna://com.webos.appInstallService/remove", { id, subscribe: false });
   },
 
   async inputs() {

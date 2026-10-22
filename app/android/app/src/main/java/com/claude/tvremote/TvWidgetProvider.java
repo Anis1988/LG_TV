@@ -166,6 +166,9 @@ public class TvWidgetProvider extends AppWidgetProvider {
                     return new String[] { "off", "Waking… tap to check" };
                 case "VOLUP":
                     tv.request("ssap://audio/volumeUp", null);
+                    if (NightVolume.enforce(ctx, tv) == NightVolume.max(ctx) && NightVolume.active(ctx)) {
+                        return new String[] { "on", "Night limit · volume " + NightVolume.max(ctx) };
+                    }
                     return new String[] { "on", volumeText(tv) };
                 case "VOLDOWN":
                     tv.request("ssap://audio/volumeDown", null);

@@ -241,6 +241,8 @@ const TV = {
     return this.luna("luna://com.webos.settingsservice/setSystemSettings", { category: "picture", settings });
   },
 
+  getNightVolume() { return Native.getNightVolume(); },
+  setNightVolume(cfg) { return Native.setNightVolume(cfg); },
   getReminder() { return Native.getReminder(); },
   setReminder(enabled, minutes) { return Native.setReminder({ enabled, minutes }); },
   getCallPause() { return Native.getCallPause().then((r) => r.enabled); },

@@ -14,7 +14,8 @@ public class BackgroundReceiver extends BroadcastReceiver {
     public void onReceive(Context ctx, Intent intent) {
         String action = intent.getAction();
         if (!SleepTimer.ACTION_SLEEP.equals(action) && !SleepTimer.ACTION_REFRESH.equals(action)
-            && !SleepTimer.ACTION_AUTO_OFF.equals(action) && !SleepTimer.ACTION_REMINDER.equals(action)) return;
+            && !SleepTimer.ACTION_AUTO_OFF.equals(action) && !SleepTimer.ACTION_REMINDER.equals(action)
+            && !SleepTimer.ACTION_NIGHT_START.equals(action)) return;
         PendingResult result = goAsync();
         new Thread(() -> {
             TvClient tv = TvClient.get(ctx);
@@ -34,7 +35,11 @@ public class BackgroundReceiver extends BroadcastReceiver {
                 TvWidgetProvider.showState(ctx, state, null);
                 SleepTimer.scheduleReminder(ctx);
             } else {
-                TvWidgetProvider.showState(ctx, tv.powerState(), null);
+                // Periodic check (and the night-window start): refresh status, keep volume under the night limit.
+                String state = tv.powerState();
+                if ("on".equals(state) || "screen_off".equals(state)) NightVolume.enforce(ctx, tv);
+                TvWidgetProvider.showState(ctx, state, null);
+                if (SleepTimer.ACTION_NIGHT_START.equals(action)) SleepTimer.scheduleNightStart(ctx);
             }
             result.finish();
         }).start();

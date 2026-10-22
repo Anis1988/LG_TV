@@ -77,6 +77,17 @@ final class SleepTimer {
 
     static final String ACTION_AUTO_OFF = "com.claude.tvremote.AUTO_OFF";
 
+    // ---- Night volume limit: check once exactly when the window starts ----
+
+    static final String ACTION_NIGHT_START = "com.claude.tvremote.NIGHT_START";
+
+    static void scheduleNightStart(Context ctx) {
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        PendingIntent pi = intent(ctx, ACTION_NIGHT_START, 11);
+        am.cancel(pi);
+        if (NightVolume.enabled(ctx)) setAt(ctx, nextAt(NightVolume.start(ctx)), pi);
+    }
+
     // ---- Daily bedtime reminder: "TV is still on" notification if it's on at the chosen time ----
 
     static final String ACTION_REMINDER = "com.claude.tvremote.BEDTIME_REMINDER";

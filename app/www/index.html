@@ -196,6 +196,8 @@
   .tgl.on i { left: 27px; }
   .time-field { flex: none; width: 130px; text-align: center; font-size: 17px; font-weight: 700; padding: 10px; }
   .set-row.disabled { opacity: .45; pointer-events: none; }
+  .night-max { flex: none; width: 150px; display: flex; align-items: center; gap: 10px; }
+  .night-max output { min-width: 24px; text-align: right; font-weight: 800; font-size: 16px; }
 
   /* Favorites */
   .fav-card { display: flex; align-items: center; gap: 6px; border-radius: 20px; padding: 8px; margin-bottom: 12px; }
@@ -595,6 +597,25 @@
         </div>
       </div>
       <div class="card glass">
+        <p class="label">Night volume limit</p>
+        <div class="set-row">
+          <div class="set-text"><b>Keep the volume down at night</b><span id="nightNote">The volume can't go above your limit.</span></div>
+          <button class="tgl" id="nightTgl" role="switch" aria-checked="false" aria-label="Night volume limit"><i></i></button>
+        </div>
+        <div class="set-row night-opt">
+          <div class="set-text"><b>Max volume</b><span>During the night window</span></div>
+          <div class="night-max"><input type="range" id="nightMax" min="1" max="50" value="15" aria-label="Max volume"><output id="nightMaxOut">15</output></div>
+        </div>
+        <div class="set-row night-opt">
+          <div class="set-text"><b>From</b></div>
+          <input type="time" class="field time-field" id="nightStart" value="22:00">
+        </div>
+        <div class="set-row night-opt">
+          <div class="set-text"><b>Until</b></div>
+          <input type="time" class="field time-field" id="nightEnd" value="07:00">
+        </div>
+      </div>
+      <div class="card glass">
         <p class="label">Bedtime reminder</p>
         <div class="set-row">
           <div class="set-text"><b>Remind me if the TV is still on</b><span id="remNote">A notification with a one-tap Turn off.</span></div>
@@ -615,7 +636,7 @@
       <div class="card glass">
         <p class="label">Lock-screen remote</p>
         <div class="set-row">
-          <div class="set-text"><b>Remote on the lock screen</b><span>While the TV is on: arrows, OK, Back, Home and volume without unlocking. Tap it for the full remote.</span></div>
+          <div class="set-text"><b>Remote on the lock screen</b><span>While the TV is on: arrows, OK, Back, Home and volume without unlocking. Tap it for the full remote. To turn the TV <i>on</i> from the lock screen, use the LG TV Quick Settings tile (see below).</span></div>
           <button class="tgl" id="lockTgl" role="switch" aria-checked="false" aria-label="Lock-screen controls"><i></i></button>
         </div>
       </div>
@@ -659,7 +680,7 @@
 <div class="sheet glass" id="kbSheet" role="dialog" aria-label="Keyboard">
   <div class="grip"></div>
   <h3>Type on TV</h3>
-  <p class="note" style="margin:0 0 14px" id="kbHint">Select a search box on the TV, then type here — letters appear as you type.</p>
+  <p class="note" style="margin:0 0 14px" id="kbHint">Works in the TV's own text boxes (LG search, web browser, settings). For YouTube, open YouTube first.</p>
   <input class="field kb-field" id="kbInput" placeholder="Type to search…" autocomplete="off" autocapitalize="off" spellcheck="false">
   <div class="sheet-row">
     <button class="ghost" id="kbClear">Clear</button>
@@ -727,6 +748,11 @@ function toast(text, err) {
 }
 
 async function act(action, body, done) {
+  // Night volume limit: don't go above it (volume buttons, phone keys, lock screen all pass here)
+  if (typeof nightActive === "function" && nightActive()) {
+    if (action === "volumeUp" && (current.volume ?? 0) >= night.max) { toast(`Night limit: max volume ${night.max}`); return; }
+    if (action === "setVolume" && body.volume > night.max) { body = { ...body, volume: night.max }; toast(`Night limit: max volume ${night.max}`); }
+  }
   try { await TV.run(action, body); if (done) toast(done); setTimeout(refresh, 300); }
   catch (e) { toast(e.message, true); }
 }
@@ -803,6 +829,12 @@ async function refresh() {
   const s = await TV.status().catch(() => ({ connected: false }));
   // A status that started before the TV went off can finish after; trust the live connection.
   if (!TV.ready) { s.connected = false; s.power = TV.power; }
+  // Someone turned it up with the real remote during the night window: bring it back down.
+  if (s.connected && typeof nightActive === "function" && nightActive() && s.volume > night.max) {
+    TV.run("setVolume", { volume: night.max }).catch(() => {});
+    toast(`Night limit: volume lowered to ${night.max}`);
+    s.volume = night.max;
+  }
   current = s;
   const p = powerInfo(s);
   $("dot").className = "dot " + p.key;
@@ -999,7 +1031,10 @@ $("volume").addEventListener("input", (e) => {
   volDragging = true;
   setVolume(e.target.value);
   clearTimeout(volTimer);
-  volTimer = setTimeout(() => { TV.run("setVolume", { volume: +e.target.value }).catch((err) => toast(err.message, true)); volDragging = false; }, 120);
+  volTimer = setTimeout(() => {
+    act("setVolume", { volume: +e.target.value });
+    volDragging = false;
+  }, 120);
 });
 $("mute").onclick = () => { buzz(); act("mute", { mute: !current.muted }); };
 $("search").addEventListener("input", renderApps);
@@ -1118,7 +1153,7 @@ async function setKbMode() {
   kbMode = app.startsWith("youtube") ? "youtube" : "live";
   $("kbHint").textContent = kbMode === "youtube"
     ? "YouTube is open. Type what you want to watch, then tap Search YouTube."
-    : "Select a search box on the TV, then type here — letters appear as you type. For YouTube, open YouTube first.";
+    : "Works in the TV's own text boxes (LG search, web browser, settings) — letters appear as you type. Netflix and Crunchyroll use their own keyboard, so typing there isn't possible. For YouTube, open YouTube first.";
   $("kbEnter").textContent = kbMode === "youtube" ? "Search YouTube" : "Search / Enter";
 }
 $("kbInput").addEventListener("input", () => {
@@ -1203,6 +1238,38 @@ async function saveAutoOff(enabled) {
 $("autoOffTgl").onclick = () => { buzz(); saveAutoOff(!$("autoOffTgl").classList.contains("on")); };
 $("autoOffTime").addEventListener("change", () => saveAutoOff(true));
 TV.getAutoOff().then(renderAutoOff).catch(() => {});
+
+/* Night volume limit (stored natively so the widget, lock screen and background checks use it too) */
+let night = { enabled: false, max: 15, start: 1320, end: 420 };
+function nightActive() {
+  if (!night.enabled) return false;
+  const d = new Date(), now = d.getHours() * 60 + d.getMinutes();
+  return night.start <= night.end ? now >= night.start && now < night.end : now >= night.start || now < night.end;
+}
+function renderNight() {
+  $("nightTgl").classList.toggle("on", night.enabled);
+  $("nightTgl").setAttribute("aria-checked", night.enabled);
+  document.querySelectorAll(".night-opt").forEach((r) => r.classList.toggle("disabled", !night.enabled));
+  $("nightMax").value = night.max;
+  $("nightMax").style.setProperty("--p", (night.max / 50 * 100) + "%");
+  $("nightMaxOut").textContent = night.max;
+  $("nightStart").value = toHHMM(night.start);
+  $("nightEnd").value = toHHMM(night.end);
+  $("nightNote").textContent = !night.enabled ? "The volume can't go above your limit."
+    : nightActive() ? `On now · max ${night.max} until ${fmtTime(new Date().setHours(Math.floor(night.end / 60), night.end % 60))}`
+    : `Max ${night.max} from ${fmtTime(new Date().setHours(Math.floor(night.start / 60), night.start % 60))}`;
+}
+async function saveNight(patch) {
+  night = { ...night, ...patch };
+  renderNight();
+  try { night = await TV.setNightVolume(night); renderNight(); refresh(); } catch (e) { toast(e.message, true); }
+}
+$("nightTgl").onclick = () => { buzz(); saveNight({ enabled: !night.enabled }); };
+$("nightMax").addEventListener("input", (e) => { $("nightMaxOut").textContent = e.target.value; $("nightMax").style.setProperty("--p", (e.target.value / 50 * 100) + "%"); });
+$("nightMax").addEventListener("change", (e) => saveNight({ max: +e.target.value }));
+$("nightStart").addEventListener("change", () => saveNight({ start: toMinutes($("nightStart").value || "22:00") }));
+$("nightEnd").addEventListener("change", () => saveNight({ end: toMinutes($("nightEnd").value || "07:00") }));
+TV.getNightVolume().then((r) => { night = r; renderNight(); }).catch(() => {});
 
 /* Bedtime reminder */
 function renderReminder(s) {

@@ -60,6 +60,29 @@ public class TvSocketPlugin extends Plugin {
         SleepTimer.scheduleRefresh(getContext());
         SleepTimer.scheduleAutoOff(getContext());
         SleepTimer.scheduleReminder(getContext());
+        SleepTimer.scheduleNightStart(getContext());
+    }
+
+    /** Night volume limit: {enabled, max, start, end} (times in minutes after midnight). */
+    @PluginMethod
+    public void setNightVolume(PluginCall call) {
+        NightVolume.save(getContext(), call.getBoolean("enabled", false),
+            Math.max(1, Math.min(100, call.getInt("max", 15))),
+            Math.max(0, Math.min(1439, call.getInt("start", 1320))),
+            Math.max(0, Math.min(1439, call.getInt("end", 420))));
+        getNightVolume(call);
+    }
+
+    @PluginMethod
+    public void getNightVolume(PluginCall call) {
+        Context ctx = getContext();
+        JSObject out = new JSObject();
+        out.put("enabled", NightVolume.enabled(ctx));
+        out.put("max", NightVolume.max(ctx));
+        out.put("start", NightVolume.start(ctx));
+        out.put("end", NightVolume.end(ctx));
+        out.put("active", NightVolume.active(ctx));
+        call.resolve(out);
     }
 
     /** Bedtime reminder: {enabled, minutes after midnight}. Needs notification permission. */

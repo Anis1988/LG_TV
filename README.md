@@ -19,15 +19,26 @@ APK lands in `app/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 First launch: open **Setup**, tap **Find TV on Wi-Fi** (or type the IP), then accept the prompt on the TV.
 
-Features: glass UI with the D-pad in thumb reach, swipe-pad mode, hold-to-repeat, phone volume keys control the TV,
-ON/OFF power switch with on/off detection, light/dark themes, keyboard (type into TV search boxes), sleep timer,
-sound output switching, a Quick Settings tile, an update banner, and a home-screen widget (power, arrows, OK,
-back, home, volume, mute, sleep) that works without opening the app.
+### Features
+
+- **Remote:** glass UI with the D-pad in thumb reach, Swipe and Mouse (touchpad pointer) modes, hold-to-repeat,
+  phone volume keys, favorite apps row (up to 5), apps list, inputs
+- **Power:** ON/OFF switch with on / screen-off / off / unreachable detection; Wake-on-LAN
+- **Night:** sleep timer, daily auto turn-off, bedtime reminder, night volume limit
+- **Sound & picture:** sound output (TV speakers, ARC, optical, Bluetooth headphones with one-tap connect),
+  picture modes and Eye comfort
+- **Keyboard:** live typing into the TV's own text boxes; YouTube search via a search link
+  (Netflix/Crunchyroll use their own keyboards and can't be typed into remotely)
+- **Outside the app:** home-screen widget, Quick Settings tile, lock-screen mini remote (opens the full remote
+  over the lock screen), app-icon shortcuts, pause/mute during phone calls
+- **App:** light/dark/auto theme, update banner from GitHub Releases
 
 Releases: pushing a `v*` tag builds the APK on GitHub Actions and attaches it to a GitHub Release.
 For power-on, enable *Settings → General → Devices → TV Management → Turn on via Wi-Fi* on the TV.
 
-## PC dashboard
+## PC dashboard (basic)
+
+The original browser remote: arrows, volume, apps, inputs, power. The phone app has far more.
 
 ```bash
 node find-tv.js            # find the TV's IP

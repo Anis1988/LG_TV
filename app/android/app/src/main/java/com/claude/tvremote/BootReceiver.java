@@ -12,6 +12,7 @@ public class BootReceiver extends BroadcastReceiver {
         if (!Intent.ACTION_BOOT_COMPLETED.equals(a) && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(a)) return;
         SleepTimer.scheduleAutoOff(ctx);
         SleepTimer.scheduleReminder(ctx);
+        SleepTimer.scheduleNightStart(ctx);
         SleepTimer.scheduleRefresh(ctx);
         long sleepAt = SleepTimer.endsAt(ctx);
         if (sleepAt > 0) SleepTimer.set(ctx, (int) Math.max(1, (sleepAt - System.currentTimeMillis()) / 60_000));

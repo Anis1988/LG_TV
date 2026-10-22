@@ -31,9 +31,10 @@ First launch: open **Setup**, tap **Find TV on Wi-Fi** (or type the IP), then ac
   (Netflix/Crunchyroll use their own keyboards and can't be typed into remotely)
 - **Outside the app:** home-screen widget, Quick Settings tile, lock-screen mini remote (opens the full remote
   over the lock screen), app-icon shortcuts, pause/mute during phone calls
+- **TV Home tab:** turns off LG home ads, suggestions and channels, removes junk apps — only after you confirm
 - **App:** light/dark/auto theme, update banner from GitHub Releases
 
-Releases: pushing a `v*` tag builds the APK on GitHub Actions and attaches it to a GitHub Release.
+Releases: every push to `main` that changes the app builds the APK on GitHub Actions and publishes the next version (v1.13.0 → v1.14.0) as a GitHub Release. A `v*` tag still sets a version by hand.
 For power-on, enable *Settings → General → Devices → TV Management → Turn on via Wi-Fi* on the TV.
 
 ## PC dashboard (basic)

@@ -21,7 +21,7 @@ First launch: open **Setup**, tap **Find TV on Wi-Fi** (or type the IP), then ac
 
 Features: glass UI with the D-pad in thumb reach, swipe-pad mode, hold-to-repeat, phone volume keys control the TV,
 ON/OFF power switch with on/off detection, light/dark themes, keyboard (type into TV search boxes), sleep timer,
-sound output switching, a Clean tab (lists TV apps, sorts junk vs keep, removes only after you confirm), a Quick Settings tile, an update banner, and a home-screen widget (power, arrows, OK,
+sound output switching, a TV Home tab (turns off LG home ads, suggestions and channels, removes junk apps — only after you confirm), a Quick Settings tile, an update banner, and a home-screen widget (power, arrows, OK,
 back, home, volume, mute, sleep) that works without opening the app.
 
 Releases: pushing a `v*` tag builds the APK on GitHub Actions and attaches it to a GitHub Release.

@@ -240,6 +240,9 @@ const TV = {
   setPicture(settings) {
     return this.luna("luna://com.webos.settingsservice/setSystemSettings", { category: "picture", settings });
   },
+  setSetting(category, settings) {
+    return this.luna("luna://com.webos.settingsservice/setSystemSettings", { category, settings });
+  },
 
   getReminder() { return Native.getReminder(); },
   setReminder(enabled, minutes) { return Native.setReminder({ enabled, minutes }); },

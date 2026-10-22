@@ -362,6 +362,7 @@
   .clean-item.on .box::after { content: "✓"; font-weight: 800; font-size: 15px; }
   .clean-item.keep { opacity: .6; }
   .clean-item.keep .box { visibility: hidden; }
+  .clean-item.info .box { display: none; }
   .clean-go { width: 100%; margin-top: 4px; }
   .clean-go:disabled { opacity: .45; box-shadow: none; }
 
@@ -584,15 +585,22 @@
       </div>
     </section>
 
-    <!-- Clean up: list apps, sort into remove / your call / keep. Nothing is removed until confirmed. -->
-    <section class="page" data-page="clean">
+    <!-- TV Home: strip the LG home screen down to just apps. Nothing changes until confirmed. -->
+    <section class="page" data-page="tvhome">
       <div class="card glass">
-        <p class="label">Clean up TV</p>
-        <p class="note" style="margin:0">Lists every app on the TV and sorts it. Nothing is removed until you tick apps and say <b>Yes</b>.</p>
-        <button class="primary clean-go" id="cleanScan" style="margin-top:12px">Scan TV apps</button>
+        <p class="label">Just apps on your TV</p>
+        <p class="note" style="margin:0">Turns off ads, suggestions and channels on the LG home screen, and removes apps you don't use. Nothing changes until you pick it and say <b>Yes</b>.</p>
+        <button class="primary clean-go" id="cleanScan" style="margin-top:12px">Scan TV</button>
       </div>
+      <div id="homeSettings"></div>
       <div id="cleanLists"></div>
-      <button class="primary clean-go" id="cleanGo" disabled>Remove selected</button>
+      <div class="card glass">
+        <p class="label">Do once on the TV</p>
+        <p class="note" style="margin:0 0 10px">LG keeps these behind its own menus. Each takes a few seconds.</p>
+        <div class="opt-list" id="manualSteps"></div>
+        <button class="ghost" id="openTvSettings" style="margin-top:10px;text-align:center">Open TV settings</button>
+      </div>
+      <button class="primary clean-go" id="cleanGo" disabled>Review changes</button>
     </section>
 
     <!-- Setup -->
@@ -673,7 +681,7 @@
   <button class="on" data-tab="remote"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>Remote</button>
   <button data-tab="apps"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>Apps</button>
   <button data-tab="more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>More</button>
-  <button data-tab="clean"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/></svg>Clean</button>
+  <button data-tab="tvhome"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 9h4M7 12h7"/></svg>TV Home</button>
   <button data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Setup</button>
 </nav>
 
@@ -728,14 +736,14 @@
   </div>
   <button class="ghost link-btn" id="btChange">Change headphones</button>
 </div>
-<div class="sheet glass tall" id="cleanSheet" role="dialog" aria-label="Confirm removal">
+<div class="sheet glass tall" id="cleanSheet" role="dialog" aria-label="Confirm changes">
   <div class="grip"></div>
-  <h3>Remove these apps?</h3>
-  <p class="note" style="margin:0 0 12px">They go away from the TV. You can get them back later from the LG Content Store.</p>
+  <h3>Make these changes?</h3>
+  <p class="note" style="margin:0 0 12px">Settings can be switched back any time. Removed apps can be put back from the LG Content Store.</p>
   <div class="opt-list" id="cleanConfirmList"></div>
   <div class="sheet-row" style="margin-top:14px">
     <button class="ghost" id="cleanNo">No</button>
-    <button class="primary" id="cleanYes">Yes, remove</button>
+    <button class="primary" id="cleanYes">Yes, do it</button>
   </div>
 </div>
 <div class="toast glass" id="toast"></div>
@@ -767,7 +775,7 @@ async function act(action, body, done) {
 const press = (name) => act("button", { name });
 
 /* Tabs with sliding indicator */
-const TABS = ["remote", "apps", "more", "clean", "settings"];
+const TABS = ["remote", "apps", "more", "tvhome", "settings"];
 function showTab(name) {
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("show", p.dataset.page === name));
@@ -1541,7 +1549,8 @@ document.addEventListener("visibilitychange", () => {
 // While the app is open it has the freshest view; keep the widget and tile in step.
 setInterval(() => { if (!document.hidden) TV.pushWidget(); }, 5 * 60 * 1000);
 
-/* Clean up: sort the TV's apps. Nothing is removed until the user ticks apps and taps Yes. */
+/* TV Home: strip the LG home screen down to just apps.
+   Nothing changes on the TV until the user picks changes and taps Yes. */
 // Preloaded promo / ad-supported apps that are safe to drop (matched by name).
 const JUNK = [
   [/lg channels/i, "LG's free ad channels"],
@@ -1552,8 +1561,30 @@ const JUNK = [
   [/home office/i, "Rarely used office hub"],
   [/pluto|tubi|xumo|vudu|fandango|sling|philo|kidoodle|facebook watch/i, "Preloaded partner app"],
 ];
+// Home-screen settings. Key names differ between webOS versions, so only the ones this TV
+// reports are shown. "best" is the value for a fast, apps-only home.
+const HOME_KEYS = [
+  { category: "general", key: "homeAutoLaunch", label: "Open Home on start", why: "Off: TV starts on your last app, not the home screen", best: "off" },
+  { category: "general", key: "homePromotion", label: "Home ads", why: "Big promo banner on the home screen", best: "off" },
+  { category: "general", key: "contentRecommendation", label: "Content suggestions", why: "Rows of shows LG picks for you", best: "off" },
+  { category: "general", key: "liveTvRecommendation", label: "Channel suggestions", why: "Live channel row on home", best: "off" },
+  { category: "general", key: "enableLivePlus", label: "Live Plus", why: "Watches what's on screen for ads; slows the TV", best: "off" },
+  { category: "general", key: "quickStartMode", label: "Quick Start+", why: "On: TV wakes instantly", best: "on" },
+];
+// Menu paths for what LG doesn't expose to remote apps (webOS 22/23).
+const MANUAL = [
+  ["Home ads & suggestions", "Settings → General → System → Additional Settings → Home Settings → turn off Home Promotion and Content Recommendation"],
+  ["Start on last app", "Settings → General → System → Additional Settings → Home Settings → Home Auto Launch off"],
+  ["Stop ad tracking", "Settings → Support → Privacy & Terms → User Agreements → untick Viewing Information and Interest-Based Recommendation"],
+  ["Live Plus off", "Settings → General → System → Additional Settings → Live Plus off"],
+  ["Block ads for good", "Settings → General → Network → Wi-Fi/Wired → Edit → set DNS to 94.140.14.14 (AdGuard)"],
+];
 let cleanApps = [];
 const cleanPick = new Set();
+let homeVals = [];
+const homeWant = new Map();
+
+const isOn = (v) => v === "on" || v === true;
 
 function cleanSort(a) {
   if (!a.removable || a.system) return { group: "keep", why: "Part of the TV — can't remove" };
@@ -1563,88 +1594,136 @@ function cleanSort(a) {
   return { group: "maybe", why: "Remove only if you never use it" };
 }
 
+function checkItem(title, why, on, onTap) {
+  const b = document.createElement("button");
+  b.className = "clean-item" + (onTap ? "" : " keep") + (on ? " on" : "");
+  b.innerHTML = '<span class="box"></span><div class="set-text"><b></b><span></span></div>';
+  b.querySelector("b").textContent = title;
+  b.querySelector(".set-text span").textContent = why;
+  if (onTap) b.onclick = () => { buzz(6); b.classList.toggle("on", onTap()); cleanCount(); };
+  return b;
+}
+
+function groupCard(label, items) {
+  const card = document.createElement("div");
+  card.className = "card glass";
+  card.innerHTML = `<p class="label"></p><div class="opt-list"></div>`;
+  card.firstChild.textContent = label;
+  items.forEach((el) => card.lastChild.appendChild(el));
+  return card;
+}
+
+function renderHome() {
+  const box = $("homeSettings");
+  box.innerHTML = "";
+  // Only offer settings that aren't already the way we want them.
+  const todo = homeVals.filter((h) => isOn(h.value) !== (h.best === "on"));
+  if (!homeVals.length) return;
+  if (!todo.length) { box.appendChild(groupCard("Home screen", [checkItem("All set", "Home settings are already clean", true)])); return; }
+  box.appendChild(groupCard(`Home screen · ${todo.length} to fix`, todo.map((h) =>
+    checkItem(`${h.label}: turn ${h.best}`, h.why, homeWant.has(h.key), () => {
+      homeWant.has(h.key) ? homeWant.delete(h.key) : homeWant.set(h.key, h);
+      return homeWant.has(h.key);
+    }))));
+}
+
 function renderClean() {
   const box = $("cleanLists");
   box.innerHTML = "";
-  const groups = [["junk", "Safe to remove"], ["maybe", "Your call"], ["keep", "Keep (system)"]];
-  groups.forEach(([g, label]) => {
+  [["junk", "Apps safe to remove"], ["maybe", "Apps — your call"], ["keep", "Apps to keep (system)"]].forEach(([g, label]) => {
     const list = cleanApps.filter((a) => cleanSort(a).group === g);
     if (!list.length) return;
-    const card = document.createElement("div");
-    card.className = "card glass";
-    card.innerHTML = `<p class="label">${label} · ${list.length}</p><div class="opt-list"></div>`;
-    list.forEach((a) => {
-      const b = document.createElement("button");
-      b.className = "clean-item" + (g === "keep" ? " keep" : "") + (cleanPick.has(a.id) ? " on" : "");
-      b.innerHTML = '<span class="box"></span><div class="set-text"><b></b><span></span></div>';
-      b.querySelector("b").textContent = a.title;
-      b.querySelector(".set-text span").textContent = cleanSort(a).why;
-      if (g !== "keep") b.onclick = () => {
-        buzz(6);
+    box.appendChild(groupCard(`${label} · ${list.length}`, list.map((a) =>
+      checkItem(a.title, cleanSort(a).why, cleanPick.has(a.id), g === "keep" ? null : () => {
         cleanPick.has(a.id) ? cleanPick.delete(a.id) : cleanPick.add(a.id);
-        b.classList.toggle("on", cleanPick.has(a.id));
-        cleanCount();
-      };
-      card.lastChild.appendChild(b);
-    });
-    box.appendChild(card);
+        return cleanPick.has(a.id);
+      }))));
   });
   cleanCount();
 }
 
 function cleanCount() {
-  $("cleanGo").disabled = !cleanPick.size;
-  $("cleanGo").textContent = cleanPick.size ? `Remove selected (${cleanPick.size})` : "Remove selected";
+  const n = cleanPick.size + homeWant.size;
+  $("cleanGo").disabled = !n;
+  $("cleanGo").textContent = n ? `Review changes (${n})` : "Review changes";
+}
+
+async function readHome() {
+  // One key per request: an unknown key can make the TV refuse the whole request.
+  const got = await Promise.allSettled(HOME_KEYS.map((h) =>
+    TV.request("ssap://settings/getSystemSettings", { category: h.category, keys: [h.key] })));
+  return HOME_KEYS.map((h, i) => ({ ...h, value: got[i].value?.settings?.[h.key] }))
+    .filter((h) => h.value !== undefined && h.value !== null);
 }
 
 async function cleanScan() {
   if (!TV.ready) return toast("Connect to the TV first", true);
   $("cleanScan").textContent = "Scanning…";
   try {
-    cleanApps = (await TV.apps()).sort((a, b) => a.title.localeCompare(b.title));
+    const [list, home] = await Promise.all([TV.apps(), readHome().catch(() => [])]);
+    cleanApps = list.sort((a, b) => a.title.localeCompare(b.title));
+    homeVals = home;
     cleanPick.forEach((id) => { if (!cleanApps.some((a) => a.id === id)) cleanPick.delete(id); });
+    homeWant.forEach((h, k) => { if (!homeVals.some((x) => x.key === k)) homeWant.delete(k); });
+    renderHome();
     renderClean();
-    toast(`Found ${cleanApps.length} apps`);
-  } catch { toast("Could not read apps", true); }
+    toast(`Found ${cleanApps.length} apps, ${homeVals.length} home settings`);
+  } catch { toast("Could not read the TV", true); }
   $("cleanScan").textContent = "Scan again";
 }
 
 function renderCleanConfirm() {
   const list = $("cleanConfirmList");
   list.innerHTML = "";
-  cleanApps.filter((a) => cleanPick.has(a.id)).forEach((a) => {
-    const d = document.createElement("div");
-    d.className = "clean-item";
-    d.textContent = a.title;
-    list.appendChild(d);
-  });
+  const line = (text) => { const d = document.createElement("div"); d.className = "clean-item"; d.textContent = text; list.appendChild(d); };
+  homeWant.forEach((h) => line(`${h.label} → ${h.best}`));
+  cleanApps.filter((a) => cleanPick.has(a.id)).forEach((a) => line(`Remove ${a.title}`));
 }
 
 async function cleanRemove() {
   closeSheet();
   const picked = cleanApps.filter((a) => cleanPick.has(a.id));
+  const settings = [...homeWant.values()];
   $("cleanGo").disabled = true;
-  $("cleanGo").textContent = "Removing…";
+  $("cleanGo").textContent = "Working…";
+  for (const h of settings) {
+    // Write the same type the TV reported (some keys are "on"/"off", some true/false).
+    const old = homeVals.find((x) => x.key === h.key)?.value;
+    const v = typeof old === "boolean" ? h.best === "on" : h.best;
+    try { await TV.setSetting(h.category, { [h.key]: v }); } catch {}
+  }
   for (const a of picked) {
     try { await TV.uninstall(a.id); } catch {}
     await new Promise((r) => setTimeout(r, 1500));
   }
-  // Check what's really gone: the TV gives no reliable answer to the remove call itself.
+  // Check what really changed: the TV gives no reliable answer to these calls.
   await new Promise((r) => setTimeout(r, 2000));
-  let left = [];
+  let appsLeft = [], setLeft = [];
   try {
     const now = await TV.apps();
-    left = picked.filter((a) => now.some((x) => x.id === a.id));
+    appsLeft = picked.filter((a) => now.some((x) => x.id === a.id));
   } catch {}
-  const gone = picked.length - left.length;
-  if (!left.length) toast(`Removed ${gone} app${gone === 1 ? "" : "s"}`);
-  else toast(`Removed ${gone}. TV refused: ${left.map((a) => a.title).join(", ")}`, true);
+  try {
+    const home = await readHome();
+    setLeft = settings.filter((h) => { const x = home.find((y) => y.key === h.key); return x && isOn(x.value) !== (h.best === "on"); });
+  } catch {}
+  homeWant.clear();
+  const failed = [...setLeft.map((h) => h.label), ...appsLeft.map((a) => a.title)];
+  const done = picked.length + settings.length - failed.length;
+  if (!failed.length) toast(`Done: ${done} change${done === 1 ? "" : "s"}`);
+  else toast(`Done ${done}. TV refused: ${failed.join(", ")}`, true);
   await cleanScan();
   loadLists();
 }
 
+MANUAL.forEach(([title, path]) => {
+  const el = checkItem(title, path, false);
+  el.className = "clean-item info";
+  $("manualSteps").appendChild(el);
+});
+$("openTvSettings").onclick = () => act("launch", { id: "com.palm.app.settings" });
 $("cleanScan").onclick = cleanScan;
-$("cleanGo").onclick = () => { if (cleanPick.size) openSheet("cleanSheet"); };
+$("cleanGo").onclick = () => { if (cleanPick.size || homeWant.size) openSheet("cleanSheet"); };
 $("cleanNo").onclick = closeSheet;
 $("cleanYes").onclick = cleanRemove;
 </script>

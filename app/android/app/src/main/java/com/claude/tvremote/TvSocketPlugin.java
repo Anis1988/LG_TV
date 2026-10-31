@@ -145,6 +145,20 @@ public class TvSocketPlugin extends Plugin {
         call.resolve(out);
     }
 
+    @PluginMethod
+    public void setStartApp(PluginCall call) {
+        getContext().getSharedPreferences(TvClient.PREFS, android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("startApp", call.getBoolean("enabled", false)).apply();
+        getStartApp(call);
+    }
+
+    @PluginMethod
+    public void getStartApp(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("enabled", TvClient.startAppOn(getContext()));
+        call.resolve(out);
+    }
+
     /** App-icon shortcuts from the favorites: [{id, title, icon}] */
     @PluginMethod
     public void setShortcuts(PluginCall call) {

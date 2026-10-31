@@ -659,6 +659,13 @@
         </div>
       </div>
       <div class="card glass">
+        <p class="label">When the TV turns on</p>
+        <div class="set-row">
+          <div class="set-text"><b>Open Free My TV</b><span>Skips LG's home with its ads. Works when you turn the TV on from this app, the widget or the Quick Settings tile.</span></div>
+          <button class="tgl" id="startTgl" role="switch" aria-checked="false" aria-label="Open Free My TV on power-on"><i></i></button>
+        </div>
+      </div>
+      <div class="card glass">
         <p class="label">Phone calls</p>
         <div class="set-row">
           <div class="set-text"><b>Pause the TV during calls</b><span>Pauses and mutes when a call rings; resumes when you hang up.</span></div>
@@ -1332,6 +1339,15 @@ async function saveReminder(enabled) {
 $("remTgl").onclick = () => { buzz(); saveReminder(!$("remTgl").classList.contains("on")); };
 $("remTime").addEventListener("change", () => saveReminder(true));
 TV.getReminder().then(renderReminder).catch(() => {});
+
+/* Open Free My TV on power-on */
+const renderStart = (on) => { $("startTgl").classList.toggle("on", on); $("startTgl").setAttribute("aria-checked", on); };
+$("startTgl").onclick = async () => {
+  buzz();
+  try { renderStart(await TV.setStartApp(!$("startTgl").classList.contains("on"))); }
+  catch (e) { toast(e.message, true); }
+};
+TV.getStartApp().then(renderStart).catch(() => {});
 
 /* Pause during calls */
 const renderCall = (on) => { $("callTgl").classList.toggle("on", on); $("callTgl").setAttribute("aria-checked", on); };

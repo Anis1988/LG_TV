@@ -104,6 +104,8 @@ const TV = {
         clearTimeout(this._regTimer);
         this.pairing = false;
         this.ready = true;
+        // Was off and just came on: open Free My TV if the user wants it.
+        if (this.power === "off" || this.power === "unreachable") this._openStartApp();
         this.setPower("on");
         this._registerKeyboard();
         this._syncNative();
@@ -248,6 +250,9 @@ const TV = {
   setNightVolume(cfg) { return Native.setNightVolume(cfg); },
   getReminder() { return Native.getReminder(); },
   setReminder(enabled, minutes) { return Native.setReminder({ enabled, minutes }); },
+  // Open Free My TV when the TV turns on (also from the widget and Quick Settings tile).
+  getStartApp() { return Native.getStartApp().then((r) => r.enabled); },
+  setStartApp(enabled) { return Native.setStartApp({ enabled }).then((r) => r.enabled); },
   getCallPause() { return Native.getCallPause().then((r) => r.enabled); },
   setCallPause(enabled) { return Native.setCallPause({ enabled }).then((r) => r.enabled); },
   setShortcuts(apps) { return Native.setShortcuts({ apps }).catch(() => {}); },
@@ -257,6 +262,13 @@ const TV = {
   setAutoOff(enabled, minutes) { return Native.setAutoOff({ enabled, minutes }); },
   getLockControls() { return Native.getLockControls().then((r) => r.enabled); },
   setLockControls(enabled) { return Native.setLockControls({ enabled }).then((r) => r.enabled); },
+
+  async _openStartApp() {
+    if (!(await this.getStartApp().catch(() => false))) return;
+    await new Promise((r) => setTimeout(r, 4000));
+    if ((await this.foregroundApp().catch(() => "")) === "io.freemytv") return;
+    this.request("ssap://system.launcher/launch", { id: "io.freemytv" }).catch(() => {});
+  },
 
   // Save the TV's MAC while it's on, so Wake-on-LAN works when it's off.
   async _rememberMac() {

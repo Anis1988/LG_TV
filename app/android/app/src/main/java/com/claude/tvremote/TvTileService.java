@@ -54,6 +54,7 @@ public class TvTileService extends TileService {
                         Thread.sleep(2500);
                         if (tv.connect(1500)) result = "on";
                     }
+                    if ("on".equals(result)) tv.openStartApp(this);
                 }
             } catch (Exception e) {
                 result = tv.stateAfterFailure();

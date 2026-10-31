@@ -161,7 +161,7 @@ public class TvWidgetProvider extends AppWidgetProvider {
                     // Give the TV a few seconds to boot, then confirm.
                     for (int i = 0; i < 4; i++) {
                         Thread.sleep(2500);
-                        if (tv.connect(1500)) return new String[] { "on", null };
+                        if (tv.connect(1500)) { tv.openStartApp(ctx); return new String[] { "on", null }; }
                     }
                     return new String[] { "off", "Waking… tap to check" };
                 case "VOLUP":

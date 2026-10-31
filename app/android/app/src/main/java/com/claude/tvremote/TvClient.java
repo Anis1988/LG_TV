@@ -26,6 +26,8 @@ import org.json.JSONObject;
  */
 final class TvClient {
     static final String PREFS = "tv";
+    /** Free My TV (github.com/simbasjungles/free-my-tv): opened on power-on when the user turns that on. */
+    static final String START_APP = "io.freemytv";
 
     private static TvClient instance;
 
@@ -235,6 +237,19 @@ final class TvClient {
     /** Like powerState() but without a fresh connect; for use right after a failed command. */
     String stateAfterFailure() {
         return lastOpened ? "off" : "unreachable";
+    }
+
+    static boolean startAppOn(Context ctx) {
+        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("startApp", false);
+    }
+
+    /** After a power-on: open Free My TV once LG's own home has loaded (earlier, the home covers it). */
+    void openStartApp(Context ctx) {
+        if (!startAppOn(ctx)) return;
+        try {
+            Thread.sleep(4000);
+            request("ssap://system.launcher/launch", new JSONObject().put("id", START_APP));
+        } catch (Exception ignored) {}
     }
 
     void wake() throws Exception {

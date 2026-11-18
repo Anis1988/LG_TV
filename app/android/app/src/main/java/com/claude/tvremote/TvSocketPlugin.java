@@ -11,6 +11,11 @@ import android.os.Build;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import com.getcapacitor.annotation.ActivityCallback;
+import androidx.activity.result.ActivityResult;
+import android.app.Activity;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Base64;
@@ -45,6 +50,7 @@ import okhttp3.WebSocketListener;
         @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT }),
         @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }),
         @Permission(alias = "phone", strings = { Manifest.permission.READ_PHONE_STATE }),
+        @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO }),
     }
 )
 public class TvSocketPlugin extends Plugin {
@@ -61,6 +67,9 @@ public class TvSocketPlugin extends Plugin {
         SleepTimer.scheduleAutoOff(getContext());
         SleepTimer.scheduleReminder(getContext());
         SleepTimer.scheduleNightStart(getContext());
+        // Hands-free voice was on: start listening again now that the app is open
+        // (Android won't let it start by itself after a reboot).
+        VoiceService.startIfEnabled(getContext());
     }
 
     /** Night volume limit: {enabled, max, start, end} (times in minutes after midnight). */
@@ -510,6 +519,133 @@ public class TvSocketPlugin extends Plugin {
             } catch (InterruptedException ignored) {}
             JSObject out = new JSObject();
             out.put("hosts", new JSArray(new ArrayList<>(hosts)));
+            call.resolve(out);
+        });
+    }
+
+    // ---- Voice commands ("Hey LG, turn off") ----
+
+    /** Sent to the page when the hands-free service hears something. */
+    void voiceEvent(String heard, String message, boolean ok, boolean done) {
+        JSObject data = new JSObject();
+        data.put("heard", heard);
+        data.put("message", message);
+        data.put("ok", ok);
+        data.put("done", done);
+        notifyListeners("voice", data);
+    }
+
+    @PluginMethod
+    public void getVoice(PluginCall call) {
+        Context ctx = getContext();
+        JSObject out = new JSObject();
+        out.put("enabled", VoiceService.enabled(ctx));
+        out.put("running", VoiceService.running);
+        out.put("wake", VoiceService.wake(ctx));
+        out.put("available", SpeechRecognizer.isRecognitionAvailable(ctx));
+        call.resolve(out);
+    }
+
+    /** Hands-free listening on/off: {enabled}. Asks for the microphone when turning on. */
+    @PluginMethod
+    public void setVoice(PluginCall call) {
+        boolean on = call.getBoolean("enabled", false);
+        if (on && !SpeechRecognizer.isRecognitionAvailable(getContext())) {
+            call.reject("This phone has no speech recognition. Install or update the Google app.");
+            return;
+        }
+        if (on && getPermissionState("microphone") != PermissionState.GRANTED) {
+            // Notifications too: without them Android still listens but hides the notification
+            // with the Stop button. Declining that one is fine.
+            String[] aliases = Build.VERSION.SDK_INT >= 33 ? new String[] { "microphone", "notifications" } : new String[] { "microphone" };
+            requestPermissionForAliases(aliases, call, "voicePermissionResult");
+            return;
+        }
+        applyVoice(call, on);
+    }
+
+    @PermissionCallback
+    private void voicePermissionResult(PluginCall call) {
+        if (getPermissionState("microphone") != PermissionState.GRANTED) {
+            call.reject("Allow the microphone so the app can hear “Hey LG”");
+            return;
+        }
+        applyVoice(call, true);
+    }
+
+    private void applyVoice(PluginCall call, boolean on) {
+        boolean started = VoiceService.setEnabled(getContext(), on);
+        if (on && !started) {
+            VoiceService.setEnabled(getContext(), false);
+            call.reject("Couldn't start listening");
+            return;
+        }
+        getVoice(call);
+    }
+
+    @PluginMethod
+    public void setVoiceWake(PluginCall call) {
+        VoiceService.setWake(getContext(), call.getString("wake", "Hey LG"));
+        getVoice(call);
+    }
+
+    /** One-shot: the phone's own speech prompt, for the mic button. Resolves {text}. */
+    @PluginMethod
+    public void listenOnce(PluginCall call) {
+        if (getPermissionState("microphone") != PermissionState.GRANTED) {
+            requestPermissionForAlias("microphone", call, "listenPermissionResult");
+            return;
+        }
+        startListenOnce(call);
+    }
+
+    @PermissionCallback
+    private void listenPermissionResult(PluginCall call) {
+        if (getPermissionState("microphone") != PermissionState.GRANTED) {
+            call.reject("Allow the microphone to use voice commands");
+            return;
+        }
+        startListenOnce(call);
+    }
+
+    private void startListenOnce(PluginCall call) {
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a TV command")
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        VoiceService.pause();
+        try {
+            startActivityForResult(call, i, "listenOnceResult");
+        } catch (Exception e) {
+            VoiceService.resume();
+            call.reject("No speech recognition on this phone. Install or update the Google app.");
+        }
+    }
+
+    @ActivityCallback
+    private void listenOnceResult(PluginCall call, ActivityResult result) {
+        VoiceService.resume();
+        if (call == null) return;
+        Intent data = result.getData();
+        ArrayList<String> heard = data == null ? null : data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+        if (result.getResultCode() != Activity.RESULT_OK || heard == null || heard.isEmpty()) {
+            call.reject("cancelled");
+            return;
+        }
+        JSObject out = new JSObject();
+        out.put("text", heard.get(0));
+        call.resolve(out);
+    }
+
+    /** Runs a spoken command on the TV: {text} -> {ok, message}. */
+    @PluginMethod
+    public void runVoice(PluginCall call) {
+        String text = call.getString("text", "");
+        pool.execute(() -> {
+            VoiceRunner.Result r = VoiceRunner.run(getContext(), text);
+            JSObject out = new JSObject();
+            out.put("ok", r.ok);
+            out.put("message", r.message);
             call.resolve(out);
         });
     }

@@ -234,6 +234,12 @@
   .cancel-sleep { display: none; margin-top: 12px; text-align: center; color: var(--bad); }
   .cancel-sleep.show { display: block; }
   .theme-btn:active { transform: scale(.94); }
+  .mic-btn { position: relative; }
+  .mic-btn .mic-live { position: absolute; top: 7px; right: 7px; width: 9px; height: 9px; border-radius: 50%; background: #1fbf76; box-shadow: 0 0 8px rgba(61,220,151,.8); display: none; }
+  .mic-btn.live .mic-live { display: block; }
+  .mic-btn.busy { animation: pulse 1s ease-in-out infinite; }
+  .voice-cmds { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .voice-cmds li { font-size: 12.5px; padding: 6px 10px; border-radius: 12px; background: var(--field); border: 1px solid var(--edge); color: var(--muted); }
   .theme-btn svg { color: var(--accent-text); }
   .seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 16px; background: var(--field); border: 1px solid var(--edge); }
   .seg3 button { min-height: 48px; border-radius: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -437,6 +443,7 @@
         <small><span class="dot" id="dot"></span><span id="state">Connecting…</span></small>
       </div>
     </div>
+    <button class="theme-btn glass mic-btn" id="micBtn" aria-label="Voice command"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><i class="mic-live"></i></button>
     <button class="theme-btn glass" id="themeBtn" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" id="themeIcon"></svg></button>
     <button class="pswitch" id="power" role="switch" aria-checked="false" aria-label="TV power"><span class="lbl" id="powerLbl">OFF</span><span class="knob"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M17.7 6.3a8 8 0 1 1-11.4 0"/></svg></span></button>
   </header>
@@ -678,6 +685,22 @@
           <div class="set-text"><b>Remote on the lock screen</b><span>While the TV is on: arrows, OK, Back, Home and volume without unlocking. Tap it for the full remote. To turn the TV <i>on</i> from the lock screen, use the LG TV Quick Settings tile (see below).</span></div>
           <button class="tgl" id="lockTgl" role="switch" aria-checked="false" aria-label="Lock-screen controls"><i></i></button>
         </div>
+      </div>
+      <div class="card glass">
+        <p class="label">Voice commands</p>
+        <div class="set-row">
+          <div class="set-text"><b>Listen for “<em id="wakeLabel" style="font-style:normal">Hey LG</em>”</b><span id="voiceNote">Hands-free, even with the app closed. A notification shows while it listens, with a Stop button.</span></div>
+          <button class="tgl" id="voiceTgl" role="switch" aria-checked="false" aria-label="Listen for wake phrase"><i></i></button>
+        </div>
+        <div class="set-row">
+          <div class="set-text"><b>Wake phrase</b><span>What you say before a command</span></div>
+          <input class="field" id="wakeInput" style="flex:0 0 130px" maxlength="24" placeholder="Hey LG" autocomplete="off">
+        </div>
+        <ul class="voice-cmds">
+          <li>turn off</li><li>turn on</li><li>volume 20</li><li>volume up</li><li>mute</li><li>pause</li><li>open Netflix</li>
+          <li>HDMI 2</li><li>sleep in 30 minutes</li><li>search YouTube for…</li><li>screen off</li><li>go home</li>
+        </ul>
+        <p class="note">Or tap the <b>mic</b> at the top and just say the command. Listening all the time uses some battery. After restarting your phone, open the app once to start listening again. “Turn on” needs <b>Turn on via Wi-Fi</b> on the TV.</p>
       </div>
       <div class="card glass">
         <p class="label">TV address</p>
@@ -1393,6 +1416,53 @@ $("lockTgl").onclick = async () => {
   } catch (e) { toast(e.message, true); }
 };
 TV.getLockControls().then(renderLock).catch(() => {});
+
+/* Voice: "Hey LG, turn off" */
+let voice = { enabled: false, wake: "Hey LG", available: true };
+function renderVoice() {
+  $("voiceTgl").classList.toggle("on", voice.enabled);
+  $("voiceTgl").setAttribute("aria-checked", voice.enabled);
+  $("micBtn").classList.toggle("live", voice.enabled);
+  $("wakeLabel").textContent = voice.wake;
+  if (document.activeElement !== $("wakeInput")) $("wakeInput").value = voice.wake;
+  if (!voice.available) $("voiceNote").textContent = "This phone has no speech recognition. Install or update the Google app.";
+}
+TV.getVoice().then((v) => { voice = v; renderVoice(); }).catch(() => {});
+$("voiceTgl").onclick = async () => {
+  buzz();
+  try {
+    voice = await TV.setVoice(!voice.enabled);
+    renderVoice();
+    if (voice.enabled) toast(`Say “${voice.wake}, turn off”`);
+  } catch (e) { toast(e.message, true); }
+};
+async function saveWake() {
+  const w = $("wakeInput").value.trim() || "Hey LG";
+  if (w === voice.wake) return;
+  try { voice = await TV.setVoiceWake(w); renderVoice(); toast(`Wake phrase: “${voice.wake}”`); }
+  catch (e) { toast(e.message, true); }
+}
+$("wakeInput").addEventListener("change", saveWake);
+$("wakeInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("wakeInput").blur(); } });
+$("micBtn").onclick = async () => {
+  buzz();
+  $("micBtn").classList.add("busy");
+  try {
+    const text = await TV.listenOnce();
+    toast(`“${text}”…`);
+    const r = await TV.runVoice(text);
+    toast(r.message, !r.ok);
+    setTimeout(refresh, 400);
+  } catch (e) {
+    if (e.message !== "cancelled") toast(e.message, true);
+  } finally { $("micBtn").classList.remove("busy"); }
+};
+// Hands-free heard something while the app is open: show it here too.
+TV.onVoice = (e) => {
+  if (!e.done) { toast(`“${e.heard}” · listening…`); return; }
+  toast(e.message, !e.ok);
+  setTimeout(refresh, 400);
+};
 
 /* Favorite apps: up to 5 shortcuts on the Remote screen, stored on the phone */
 const FAV_MAX = 5;

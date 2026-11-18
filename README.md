@@ -27,6 +27,10 @@ First launch: open **Setup**, tap **Find TV on Wi-Fi** (or type the IP), then ac
 - **Night:** sleep timer, daily auto turn-off, bedtime reminder, night volume limit
 - **Sound & picture:** sound output (TV speakers, ARC, optical, Bluetooth headphones with one-tap connect),
   picture modes and Eye comfort
+- **Voice:** say "Hey LG, turn off" hands-free (keeps listening with the app closed, notification with a Stop
+  button), or tap the mic and say the command. Turn on/off, volume ("volume 20", "louder"), mute, play/pause,
+  open apps by name, HDMI inputs, channels, sleep timer ("sleep in 30 minutes"), YouTube search, Home/Back/OK.
+  Wake phrase can be changed in Setup
 - **Keyboard:** live typing into the TV's own text boxes; YouTube search via a search link
   (Netflix/Crunchyroll use their own keyboards and can't be typed into remotely)
 - **Outside the app:** home-screen widget, Quick Settings tile, lock-screen mini remote (opens the full remote

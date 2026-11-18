@@ -263,6 +263,15 @@ const TV = {
   getLockControls() { return Native.getLockControls().then((r) => r.enabled); },
   setLockControls(enabled) { return Native.setLockControls({ enabled }).then((r) => r.enabled); },
 
+  // Voice: "Hey LG, turn off". Hands-free listening runs natively (works with the app closed);
+  // the mic button uses the phone's own speech prompt. Commands run natively either way.
+  getVoice() { return Native.getVoice(); },
+  setVoice(enabled) { return Native.setVoice({ enabled }); },
+  setVoiceWake(wake) { return Native.setVoiceWake({ wake }); },
+  listenOnce() { return Native.listenOnce().then((r) => r.text); },
+  runVoice(text) { return Native.runVoice({ text }); },
+  onVoice: () => {},
+
   async _openStartApp() {
     if (!(await this.getStartApp().catch(() => false))) return;
     await new Promise((r) => setTimeout(r, 4000));
@@ -476,4 +485,5 @@ TV.onHwKey = () => {};
 Native.addListener("message", (e) => TV._onMessage(e));
 Native.addListener("closed", (e) => TV._onClosed(e));
 Native.addListener("hwkey", (e) => TV.onHwKey(e.key));
+Native.addListener("voice", (e) => TV.onVoice(e));
 window.TV = TV;
